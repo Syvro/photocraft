@@ -1,6 +1,7 @@
-//! Image › Analysis and Notes in the shell: the Ruler, Count and Note tools (eyedropper group),
-//! their canvas overlays and options bars, Window › Measurement Log and Window › Notes, and the
-//! Set Measurement Scale / Select Data Points / Place Scale Marker dialogs.
+//! Image › Analysis and Notes in the shell: the Ruler, Count, Note and Color Sampler tools
+//! (eyedropper group), their canvas overlays and options bars, Window › Measurement Log and
+//! Window › Notes, and the Set Measurement Scale / Select Data Points / Place Scale Marker
+//! dialogs.
 //!
 //! Every change goes through engine commands (`image.analysis.*`, `count.*`, `notes.*`,
 //! `measurementLog.*`); this module only holds view state ([`AnalysisUi`], part of the
@@ -27,6 +28,8 @@ pub enum Drag {
     Count(usize, usize, [f64; 2]),
     /// Moving note `index`: grab offset from its position.
     Note(usize, [f64; 2]),
+    /// Moving colour sampler `index`: grab offset from its position.
+    Sampler(usize, [f64; 2]),
 }
 
 /// View state of the analysis tools and panels.
@@ -40,6 +43,8 @@ pub struct AnalysisUi {
     pub log_selected: Vec<u64>,
     /// Notes panel: the note shown (index).
     pub note_selected: Option<usize>,
+    /// Colour Sampler markers in document pixel coordinates (Photoshop caps these at 10).
+    pub color_samplers: Vec<[i32; 2]>,
     /// Note tool options: author and colour of new notes.
     pub note_author: String,
     pub note_color: [f32; 3],
@@ -58,6 +63,7 @@ impl Default for AnalysisUi {
             notes: false,
             log_selected: Vec::new(),
             note_selected: None,
+            color_samplers: Vec::new(),
             note_author: String::new(),
             note_color: [1.0, 1.0, 0.51],
             use_measurement_scale: false,
@@ -210,6 +216,9 @@ fn dist(a: [f64; 2], b: [f64; 2]) -> f64 {
     (a[0] - b[0]).hypot(a[1] - b[1])
 }
 
+/// Photoshop allows at most this many colour samplers on one document.
+pub const MAX_SAMPLERS: usize = 10;
+
 /// Shift constrains to 45° steps around `from`.
 fn constrain(from: [f64; 2], to: [f64; 2], shift: bool) -> [f64; 2] {
     if !shift {
@@ -225,10 +234,10 @@ fn set_ruler(app: &mut PhotocraftApp, r: Ruler) {
     let _ = app.run("image.analysis.rulerTool", json!({"start": r.start, "end": r.end, "protractor": r.protractor}));
 }
 
-/// Pointer input for the Ruler, Count and Note tools. Returns true when consumed.
+/// Pointer input for the Ruler, Count, Note and Color Sampler tools. Returns true when consumed.
 pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) -> bool {
     let tool = app.ui.tool;
-    if !matches!(tool, Tool::Ruler | Tool::Count | Tool::Note) {
+    if !matches!(tool, Tool::Ruler | Tool::Count | Tool::Note | Tool::ColorSampler) {
         return false;
     }
     let Some(doc) = app.session.active().map(|d| d.doc.clone()) else { return true };
@@ -320,6 +329,38 @@ pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers) ->
                 }
             }
         }
+        (Tool::ColorSampler, ToolEvent::Down { x, y, .. }) => {
+            let hit = nearest_sampler(app, [x, y], tol);
+            match hit {
+                Some(i) if mods.alt => {
+                    app.ui.analysis.color_samplers.remove(i);
+                }
+                Some(i) => {
+                    let at = app.ui.analysis.color_samplers[i];
+                    app.ui.analysis.drag = Some(Drag::Sampler(i, [x - f64::from(at[0]), y - f64::from(at[1])]));
+                }
+                None if !mods.alt && app.ui.analysis.color_samplers.len() < MAX_SAMPLERS => {
+                    let w = doc.size.width as i32;
+                    let h = doc.size.height as i32;
+                    let p = [x.round().clamp(0.0, f64::from(w.max(1) - 1)) as i32, y.round().clamp(0.0, f64::from(h.max(1) - 1)) as i32];
+                    app.ui.analysis.color_samplers.push(p);
+                    app.ui.analysis.drag = Some(Drag::Sampler(app.ui.analysis.color_samplers.len() - 1, [0.0, 0.0]));
+                }
+                None => {}
+            }
+        }
+        (Tool::ColorSampler, ToolEvent::Move { x, y, .. }) => {
+            if let Some(Drag::Sampler(i, _)) = app.ui.analysis.drag
+                && let Some(p) = app.ui.analysis.color_samplers.get_mut(i)
+            {
+                let w = doc.size.width as i32;
+                let h = doc.size.height as i32;
+                *p = [x.round().clamp(0.0, f64::from(w.max(1) - 1)) as i32, y.round().clamp(0.0, f64::from(h.max(1) - 1)) as i32];
+            }
+        }
+        (Tool::ColorSampler, ToolEvent::Up { .. }) => {
+            app.ui.analysis.drag = None;
+        }
         _ => {}
     }
     true
@@ -336,6 +377,17 @@ fn nearest_marker(d: &Document, at: [f64; 2], tol: f64) -> Option<(usize, usize)
         }
     }
     best.map(|b| (b.1, b.2))
+}
+
+fn nearest_sampler(app: &PhotocraftApp, at: [f64; 2], tol: f64) -> Option<usize> {
+    let mut best: Option<(f64, usize)> = None;
+    for (i, p) in app.ui.analysis.color_samplers.iter().enumerate() {
+        let dd = dist([f64::from(p[0]), f64::from(p[1])], at);
+        if dd <= tol && best.is_none_or(|b| dd < b.0) {
+            best = Some((dd, i));
+        }
+    }
+    best.map(|b| b.1)
 }
 
 fn color32(c: [f32; 3]) -> Color32 {
@@ -401,6 +453,17 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
                 painter.line_segment([pos2(r.left() + 3.0, y), pos2(r.right() - 3.0, y)], Stroke::new(1.0, ink));
             }
         }
+    }
+    // Colour Sampler markers: a numbered reticle that stays until removed, regardless of the
+    // active tool, like Photoshop's.
+    for (i, p) in app.ui.analysis.color_samplers.iter().enumerate() {
+        let at = xf.to_screen(p[0] as f32, p[1] as f32);
+        for (w, c) in [(3.0, Color32::from_black_alpha(180)), (1.0, Color32::WHITE)] {
+            painter.line_segment([at - vec2(5.0, 0.0), at + vec2(5.0, 0.0)], Stroke::new(w, c));
+            painter.line_segment([at - vec2(0.0, 5.0), at + vec2(0.0, 5.0)], Stroke::new(w, c));
+        }
+        painter.text(at + vec2(6.0, -2.0), Align2::LEFT_TOP, format!("{}", i + 1), FontId::proportional(11.0), Color32::BLACK);
+        painter.text(at + vec2(6.5, -1.5), Align2::LEFT_TOP, format!("{}", i + 1), FontId::proportional(11.0), Color32::WHITE);
     }
 }
 
@@ -495,6 +558,20 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
             }
             if crate::icons::button(ui, "message-square", 22.0, app.ui.analysis.notes, tl!("Show or hide the Notes panel")).clicked() {
                 app.ui.analysis.notes = !app.ui.analysis.notes;
+            }
+            true
+        }
+        Tool::ColorSampler => {
+            let t = Tokens::get(ui.ctx());
+            let n = app.ui.analysis.color_samplers.len();
+            ui.label(RichText::new(crate::i18n::fmt(tl!("Count: {n}"), &[("n", &n.to_string())])).color(t.text).size(11.0));
+            crate::widgets::vline(ui, 22.0);
+            ui.label(RichText::new(tl!("Sample Size:")).color(t.text_dim).size(12.0));
+            let o = &mut app.ui.tool_options;
+            crate::widgets::dropdown(ui, "sampler-size", &mut o.eyedropper_size, &crate::eyedropper_ui::size_options(), 130.0);
+            crate::widgets::vline(ui, 22.0);
+            if crate::widgets::secondary_button(ui, tl!("Clear"), 0.0).clicked() {
+                app.ui.analysis.color_samplers.clear();
             }
             true
         }

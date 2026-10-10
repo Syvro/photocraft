@@ -2733,6 +2733,8 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                         pipette_cursor(ui.ctx(), p)
                     }
                 }
+                // The Color Sampler always uses the Photoshop target crosshair.
+                Tool::ColorSampler => egui::CursorIcon::Crosshair,
                 // Preferences › Cursors › Other Cursors: Precise shows a crosshair for every tool.
                 Tool::Move | Tool::Type | Tool::VerticalType if app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise => {
                     egui::CursorIcon::Crosshair
@@ -3792,6 +3794,22 @@ pub(crate) fn finish_gesture(app: &mut PhotocraftApp, d: Drag) {
                 // Raw preview key 0 = the document itself (its colour display folded in).
                 shown_as_document(app, l.doc, |k| l.since(k).is_some());
             }
+        }
+        Tool::SingleRowMarquee | Tool::SingleColumnMarquee => {
+            let Some(st) = app.session.active() else { return };
+            let (w, h) = (st.doc.size.width, st.doc.size.height);
+            if w == 0 || h == 0 {
+                return;
+            }
+            let mode = selection_mode(app, d.modifiers);
+            let (x, y) = if d.tool == Tool::SingleRowMarquee {
+                let y = d.points.last().map(|p| p[1]).unwrap_or(d.start[1]).floor().clamp(0.0, f64::from(h - 1)) as u32;
+                (0, y)
+            } else {
+                let x = d.points.last().map(|p| p[0]).unwrap_or(d.start[0]).floor().clamp(0.0, f64::from(w - 1)) as u32;
+                (x, 0)
+            };
+            let _ = app.run("select.rect", json!({"x": x, "y": y, "width": if d.tool == Tool::SingleRowMarquee { w } else { 1 }, "height": if d.tool == Tool::SingleRowMarquee { 1 } else { h }, "mode": mode, "ellipse": false, "antiAlias": false, "feather": 0}));
         }
         Tool::RectMarquee | Tool::EllipseMarquee => {
             let (a, b) = marquee_corners(&app.ui.tool_options, &d, [end[0], end[1]]);

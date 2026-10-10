@@ -17,11 +17,11 @@ use crate::{PhotocraftApp, icons, widgets};
 const TOOL_SECTIONS: &[&[&[Tool]]] = &[
     &[&[Tool::Move]],
     &[
-        &[Tool::RectMarquee, Tool::EllipseMarquee],
+        &[Tool::RectMarquee, Tool::EllipseMarquee, Tool::SingleRowMarquee, Tool::SingleColumnMarquee],
         &[Tool::Lasso, Tool::PolygonLasso, Tool::MagneticLasso],
         &[Tool::ObjectSelection, Tool::QuickSelection, Tool::MagicWand],
         &[Tool::Crop, Tool::Slice, Tool::SliceSelect],
-        &[Tool::Eyedropper, Tool::Ruler, Tool::Note, Tool::Count],
+        &[Tool::Eyedropper, Tool::ColorSampler, Tool::Ruler, Tool::Note, Tool::Count],
     ],
     &[
         &[Tool::SpotHealing, Tool::Healing, Tool::Patch, Tool::ContentAwareMove, Tool::RedEye],
@@ -808,6 +808,9 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                         widgets::vline(ui, 22.0);
                         widgets::checkbox(ui, &mut b.mixer.sample_all_layers, tl!("Sample All Layers"));
                     }
+                    Tool::SingleRowMarquee | Tool::SingleColumnMarquee if t.pro => {
+                        selection_mode_buttons(app, ui);
+                    }
                     Tool::RectMarquee | Tool::EllipseMarquee if t.pro => {
                         ui.spacing_mut().item_spacing.x = 2.0;
                         for (i, (icon, tip)) in [
@@ -1052,6 +1055,16 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                             section(ui, tl!("Distribute"), "layer.distribute.");
                         });
                     }
+                    Tool::SingleRowMarquee | Tool::SingleColumnMarquee => hint(
+                        ui,
+                        &format!(
+                            "Click to select a 1-pixel {}  ·  {} add  ·  {} subtract  ·  {} intersect",
+                            if app.ui.tool == Tool::SingleRowMarquee { "row" } else { "column" },
+                            crate::shortcuts::pretty("Shift"),
+                            crate::shortcuts::pretty("Alt"),
+                            crate::shortcuts::pretty("Shift+Alt")
+                        ),
+                    ),
                     Tool::RectMarquee | Tool::EllipseMarquee => hint(
                         ui,
                         &format!(
@@ -1432,6 +1445,32 @@ fn info_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         row(&mut cols[1], "W:", sel.map_or_else(dash, |r| fx(r.width() as f64)));
         row(&mut cols[1], "H:", sel.map_or_else(dash, |r| fy(r.height() as f64)));
     });
+    // Colour Sampler markers: `N:  X, Y` on the left and the sampled `R G B` on the right, each
+    // read with the same Sample Size as the pointer readout (#1649).
+    let samples = &app.ui.analysis.color_samplers;
+    if !samples.is_empty() {
+        widgets::hairline(ui);
+        let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as i32;
+        let rgbs: Vec<Option<[f32; 4]>> = samples
+            .iter()
+            .map(|p| {
+                let v: Vec<f32> = serde_json::from_value(
+                    app.session
+                        .execute("document.sampleColor", json!({"x": f64::from(p[0]) + 0.5, "y": f64::from(p[1]) + 0.5, "size": sample_size}))
+                        .ok()?,
+                )
+                .ok()?;
+                Some([*v.first()?, *v.get(1)?, *v.get(2)?, *v.get(3)?])
+            })
+            .collect();
+        ui.columns(2, |cols| {
+            let dash = || "—".to_string();
+            for (i, rgba) in rgbs.iter().enumerate() {
+                row(&mut cols[0], &format!("{}:", i + 1), Some(samples[i]).map_or_else(dash, |p| format!("{}, {}", p[0], p[1])));
+                row(&mut cols[1], &format!("#{}", i + 1), rgba.map_or_else(dash, |c| format!("{} {} {}", q(c[0]), q(c[1]), q(c[2]))));
+            }
+        });
+    }
     widgets::hairline(ui);
     ui.label(
         RichText::new(crate::i18n::fmt(tl!("Doc: {w} × {h} px"), &[("w", &size.width.to_string()), ("h", &size.height.to_string())]))

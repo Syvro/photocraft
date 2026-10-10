@@ -65,12 +65,15 @@ pub enum Tool {
     Move,
     RectMarquee,
     EllipseMarquee,
+    SingleRowMarquee,
+    SingleColumnMarquee,
     Lasso,
     PolygonLasso,
     MagneticLasso,
     MagicWand,
     Crop,
     Eyedropper,
+    ColorSampler,
     Ruler,
     Note,
     Count,
@@ -117,16 +120,19 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 52] = [
+    pub const ALL: [Tool; 55] = [
         Tool::Move,
         Tool::RectMarquee,
         Tool::EllipseMarquee,
+        Tool::SingleRowMarquee,
+        Tool::SingleColumnMarquee,
         Tool::Lasso,
         Tool::PolygonLasso,
         Tool::MagneticLasso,
         Tool::MagicWand,
         Tool::Crop,
         Tool::Eyedropper,
+        Tool::ColorSampler,
         Tool::Ruler,
         Tool::Note,
         Tool::Count,
@@ -177,6 +183,8 @@ impl Tool {
             Tool::Move => "Move Tool",
             Tool::RectMarquee => "Rectangular Marquee Tool",
             Tool::EllipseMarquee => "Elliptical Marquee Tool",
+            Tool::SingleRowMarquee => "Single Row Marquee Tool",
+            Tool::SingleColumnMarquee => "Single Column Marquee Tool",
             Tool::Brush => "Brush Tool",
             Tool::Pencil => "Pencil Tool",
             Tool::MixerBrush => "Mixer Brush Tool",
@@ -184,6 +192,7 @@ impl Tool {
             Tool::BackgroundEraser => "Background Eraser Tool",
             Tool::MagicEraser => "Magic Eraser Tool",
             Tool::Eyedropper => "Eyedropper Tool",
+            Tool::ColorSampler => "Color Sampler Tool",
             Tool::Ruler => "Ruler Tool",
             Tool::Note => "Note Tool",
             Tool::Count => "Count Tool",
@@ -258,10 +267,10 @@ impl Tool {
     pub fn key(self) -> char {
         match self {
             Tool::Move => 'V',
-            Tool::RectMarquee | Tool::EllipseMarquee => 'M',
+            Tool::RectMarquee | Tool::EllipseMarquee | Tool::SingleRowMarquee | Tool::SingleColumnMarquee => 'M',
             Tool::Brush | Tool::Pencil | Tool::MixerBrush => 'B',
             Tool::Eraser | Tool::BackgroundEraser | Tool::MagicEraser => 'E',
-            Tool::Eyedropper | Tool::Ruler | Tool::Note | Tool::Count => 'I',
+            Tool::Eyedropper | Tool::ColorSampler | Tool::Ruler | Tool::Note | Tool::Count => 'I',
             Tool::Lasso | Tool::PolygonLasso | Tool::MagneticLasso => 'L',
             Tool::MagicWand => 'W',
             Tool::Crop | Tool::Slice | Tool::SliceSelect => 'C',
@@ -287,10 +296,13 @@ impl Tool {
             Tool::Move => "✥",
             Tool::RectMarquee => "⬚",
             Tool::EllipseMarquee => "◌",
+            Tool::SingleRowMarquee => "▰",
+            Tool::SingleColumnMarquee => "▯",
             Tool::Brush => "🖌",
             Tool::MixerBrush => "🖌",
             Tool::Eraser => "⌫",
             Tool::Eyedropper => "💧",
+            Tool::ColorSampler => "◈",
             Tool::Lasso | Tool::PolygonLasso | Tool::MagneticLasso => "L",
             Tool::MagicWand => "W",
             Tool::Crop => "C",
@@ -1070,7 +1082,13 @@ mod tests {
         assert!(!Tool::RedEye.is_brushlike());
         assert_eq!(Tool::from_name("patternStamp"), Some(Tool::PatternStamp));
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
-        assert_eq!(Tool::ALL.len(), 52);
+        assert_eq!(Tool::ALL.len(), 55);
+        assert_eq!(Tool::from_name("SingleRowMarquee"), Some(Tool::SingleRowMarquee));
+        assert_eq!(Tool::from_name("singleColumn"), Some(Tool::SingleColumnMarquee));
+        assert_eq!(Tool::SingleRowMarquee.key(), 'M');
+        assert_eq!(Tool::from_name("ColorSampler"), Some(Tool::ColorSampler));
+        assert_eq!(Tool::from_name("Color Sampler Tool"), Some(Tool::ColorSampler));
+        assert_eq!(Tool::ColorSampler.key(), 'I');
         assert_eq!(Tool::from_name("RotateView"), Some(Tool::RotateView));
         assert_eq!(Tool::from_name("Rotate View Tool"), Some(Tool::RotateView));
         assert_eq!(Tool::RotateView.key(), 'R');

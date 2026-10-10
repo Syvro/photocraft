@@ -1659,6 +1659,9 @@ mod blend_dropdown_keys_tests;
 mod marquee_tests;
 
 #[cfg(test)]
+mod color_sampler_tests;
+
+#[cfg(test)]
 mod stamp_tests;
 
 #[cfg(test)]

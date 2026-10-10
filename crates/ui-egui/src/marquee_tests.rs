@@ -408,3 +408,21 @@ fn alt_with_nothing_selected_draws_a_new_selection() {
     let after = h.state().session.active().unwrap().doc.selection.as_ref().map(|s| s.content_bounds());
     assert!(after.is_none_or(|r| r.is_empty() || r != before), "⌥ subtracted: {before:?} -> {after:?}");
 }
+
+/// The Single Row / Single Column Marquee are click tools: a click selects a 1-pixel line across
+/// the whole canvas (full width for a row, full height for a column), at the clicked coordinate.
+#[test]
+fn single_row_and_column_marquee_select_one_pixel_lines() {
+    let mut h = harness(Tool::SingleRowMarquee);
+    let p = screen(&h, 250.0, 120.0);
+    button(&mut h, p, true, Modifiers::NONE);
+    button(&mut h, p, false, Modifiers::NONE);
+    h.run_steps(2);
+    assert_eq!(selection(&h), Rect::new(0, 120, 400, 121), "single row: full width, 1 px tall");
+    let mut h = harness(Tool::SingleColumnMarquee);
+    let p = screen(&h, 250.0, 120.0);
+    button(&mut h, p, true, Modifiers::NONE);
+    button(&mut h, p, false, Modifiers::NONE);
+    h.run_steps(2);
+    assert_eq!(selection(&h), Rect::new(250, 0, 251, 300), "single column: 1 px wide, full height");
+}
