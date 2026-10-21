@@ -106,7 +106,7 @@ pub fn edit_active(app: &mut PhotocraftApp) -> Result<(), String> {
         commit(app);
         let key = session_key(app);
         begin_edit(app, id, &key)?;
-        app.ui.text_edit = Some(TextEdit { layer: id.0, caret: n, anchor: 0, session: key, created: false, dragging: false, resize: None, preedit: None });
+        app.ui.text_edit = Some(TextEdit { layer: id.0, caret: n, anchor: 0, session: key, created: false, mask: app.ui.tool.is_type_mask(), dragging: false, resize: None, preedit: None });
     } else if let Some(ed) = app.ui.text_edit.as_mut() {
         ed.anchor = 0;
         ed.caret = n;
@@ -226,7 +226,7 @@ pub fn pointer_down(app: &mut PhotocraftApp, x: f64, y: f64, shift: bool) -> boo
             return true;
         }
         let off = hit_offset(app, id, x, y);
-        app.ui.text_edit = Some(TextEdit { layer: id.0, caret: off, anchor: off, session: key, created: false, dragging: true, resize: None, preedit: None });
+        app.ui.text_edit = Some(TextEdit { layer: id.0, caret: off, anchor: off, session: key, created: false, mask: app.ui.tool.is_type_mask(), dragging: true, resize: None, preedit: None });
         return true;
     }
     false
@@ -256,9 +256,10 @@ pub fn pointer_up(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2]) {
     let (w, h) = ((end[0] - start[0]).abs(), (end[1] - start[1]).abs());
     let min = 4.0 / app.current_zoom().max(0.01) as f64;
     let o = app.ui.tool_options.clone();
+    let vertical = matches!(app.ui.tool, crate::state::Tool::VerticalType | crate::state::Tool::VerticalTypeMask);
     let mut p = json!({
         "text": PLACEHOLDER,
-        "orientation": if app.ui.tool == crate::state::Tool::VerticalType { "vertical" } else { "horizontal" },
+        "orientation": if vertical { "vertical" } else { "horizontal" },
         "font": o.type_font,
         "fontStyle": o.type_style,
         "size": o.type_size,
@@ -281,7 +282,7 @@ pub fn pointer_up(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2]) {
         }
         // Like Photoshop: the placeholder is selected, so typing replaces it.
         let n = PLACEHOLDER.chars().count();
-        app.ui.text_edit = Some(TextEdit { layer: id, caret: n, anchor: 0, session: key, created: true, dragging: false, resize: None, preedit: None });
+        app.ui.text_edit = Some(TextEdit { layer: id, caret: n, anchor: 0, session: key, created: true, mask: app.ui.tool.is_type_mask(), dragging: false, resize: None, preedit: None });
     }
 }
 
@@ -566,6 +567,11 @@ pub fn handle_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
 }
 
 /// End the editing session. A new layer left empty is deleted; a new layer is named after its text.
+///
+/// The Horizontal/Vertical Type Mask tools take a different exit (#type-mask): their typed glyphs
+/// become a **selection** instead of a layer. A transient layer they created is rendered with
+/// `type.mask` and then deleted, all inside the create's coalesced step, so one undo removes the
+/// whole typing gesture and the selection with it. A pre-existing layer (edited as a mask) is kept.
 pub fn commit(app: &mut PhotocraftApp) {
     if app.ui.tool.is_type() {
         crate::type_transform::finish(app);
@@ -573,8 +579,26 @@ pub fn commit(app: &mut PhotocraftApp) {
     crate::type_transform::reset(app);
     let Some(ed) = app.ui.text_edit.take() else { return };
     let Some(text) = current_text(app, LayerId(ed.layer)) else { return };
-    if text.trim().is_empty() && ed.created {
-        let _ = app.run("layer.delete", json!({"layer": ed.layer}));
+    // The mask intent is recorded on the session, not read from the live tool: switching to a
+    // non-type tool commits *after* the tool has already changed (lib.rs commit-on-tool-switch).
+    let mask = ed.mask;
+    if text.trim().is_empty() {
+        if ed.created {
+            // A mask session is one gesture: coalesce the discard into its create step.
+            if mask {
+                let _ = app.run("layer.delete", json!({"layer": ed.layer, "coalesce": ed.session}));
+            } else {
+                let _ = app.run("layer.delete", json!({"layer": ed.layer}));
+            }
+        }
+        return;
+    }
+    if mask {
+        // Render the glyphs to a selection, then drop the transient layer, in one history step.
+        let _ = app.run("type.mask", json!({"layer": ed.layer, "coalesce": ed.session}));
+        if ed.created {
+            let _ = app.run("layer.delete", json!({"layer": ed.layer, "coalesce": ed.session}));
+        }
     } else if ed.created {
         let name = photocraft_engine::type_cmds::layer_name(&text);
         let _ = app.run("type.edit", json!({"layer": ed.layer, "name": name, "coalesce": ed.session}));

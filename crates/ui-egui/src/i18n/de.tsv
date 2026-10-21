@@ -353,6 +353,7 @@
 	Video Frames to Layers…	Video-Frames in Ebenen…
 	Rasterize	Rasterisieren
 	Rasterize Type	Text rasterisieren
+	Create Selection from Type	Auswahl aus Text erstellen
 	Rasterize Type Layer	Textebene rasterisieren
 	Rasterize Shape	Form rasterisieren
 	New Guide Layout…	Neues Hilfslinien-Layout…
@@ -975,6 +976,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Ziehe auf dem Bild, um eine Zwangsbedingung hinzuzufügen; Shift für horizontal/vertikal; Rechtsklick löscht.
 	Drag to move the active shape's path or the Work Path	Ziehen, um den Pfad der aktiven Form oder den Arbeitspfad zu verschieben
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klick: Ankerpunkt auswählen · Ziehen: Ankerpunkt, Griff oder Segment verschieben · {shift}-Klick: hinzufügen · {alt}-Klick: ganzer Teilpfad
+	Click a segment to add an anchor point	Klicken Sie auf ein Segment, um einen Ankerpunkt hinzuzufügen
+	Click an anchor point to delete it	Klicken Sie auf einen Ankerpunkt, um ihn zu löschen
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Klicken: glatter Punkt · Klick auf ersten Punkt: schließen · {key} beenden · Esc abbrechen
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Ziehen für Freihandzeichnen · Klick auf ersten Punkt: schließen · {key} beenden · Esc abbrechen
 	Draw with the Pen tool (P) or make a work path from a selection.	Zeichne mit dem Stift-Werkzeug (P) oder erzeuge einen Arbeitspfad aus einer Auswahl.
 	Drop an image or PSD anywhere to open it.	Ziehe ein Bild oder PSD an eine beliebige Stelle, um es zu öffnen.
 	Native file drag-and-drop is unavailable	Natives Ziehen und Ablegen von Dateien ist nicht verfügbar
@@ -1616,6 +1621,10 @@
 	Pen Pressure	Stiftdruck
 	Pen Tilt	Stiftneigung
 	Pen Tool	Stift-Werkzeug
+	Add Anchor Point Tool	Ankerpunkt hinzufügen-Werkzeug
+	Curvature Pen Tool	Kurvenstift-Werkzeug
+	Delete Anchor Point Tool	Ankerpunkt löschen-Werkzeug
+	Freeform Pen Tool	Freihandstift-Werkzeug
 	Photo	Foto
 	PhotoCraft website	PhotoCraft-Website
 	Picas	Pica

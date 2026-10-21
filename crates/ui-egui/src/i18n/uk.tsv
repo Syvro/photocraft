@@ -152,6 +152,7 @@
 	Export Contents…	Експортувати вміст…
 	Rasterize	Растеризувати
 	Rasterize Type	Растеризувати текст
+	Create Selection from Type	Створити виділену область з тексту
 	Rasterize Shape	Растеризувати фігуру
 	New Adjustment Layer	Новий коригувальний шар
 	New Fill Layer	Новий шар заливки
@@ -1088,6 +1089,10 @@
 	Create new shape from the current path	Створити нову фігуру з поточного контуру
 	Drag to move the active shape's path or the Work Path	Перетягніть, щоб перемістити контур активної фігури або робочий контур
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Клацання: вибрати вузол · Перетягування: перемістити вузол, ручку або сегмент · {shift}+клацання: додати · {alt}+клацання: увесь підконтур
+	Click a segment to add an anchor point	Клацніть сегмент, щоб додати вузол
+	Click an anchor point to delete it	Клацніть вузол, щоб видалити його
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Клацання: згладжений вузол · Клацання першої точки: замкнути · {key} — завершити · Esc — скасувати
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Перетягніть, щоб малювати від руки · Клацання першої точки: замкнути · {key} — завершити · Esc — скасувати
 	Draw with the Pen tool (P) or make a work path from a selection.	Малюйте пером (P) або створіть робочий контур із виділення.
 
 # Clone Source panel
@@ -1503,6 +1508,10 @@
 	Quick Selection Tool	Інструмент «Швидке виділення»
 	Object Selection Tool	Інструмент «Виділення об'єкта»
 	Pen Tool	Інструмент «Перо»
+	Add Anchor Point Tool	Інструмент «Додати вузол»
+	Curvature Pen Tool	Інструмент «Перо кривизни»
+	Delete Anchor Point Tool	Інструмент «Видалити вузол»
+	Freeform Pen Tool	Інструмент «Вільне перо»
 	Path Selection Tool	Інструмент «Виділення контуру»
 	Direct Selection Tool	Інструмент «Пряме виділення»
 	Rectangle Tool	Інструмент «Прямокутник»

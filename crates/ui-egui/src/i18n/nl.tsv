@@ -346,6 +346,7 @@
 	Video Frames to Layers…	Videoframes naar lagen…
 	Rasterize	Rasteren
 	Rasterize Type	Tekst rasteren
+	Create Selection from Type	Selectie maken van tekst
 	Rasterize Type Layer	Tekstlaag rasteren
 	Rasterize Shape	Vorm rasteren
 	New Guide Layout…	Nieuwe hulplijnindeling…
@@ -968,6 +969,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Sleep over de afbeelding om een beperking toe te voegen; Shift voor horizontaal/verticaal; rechtsklik om te verwijderen.
 	Drag to move the active shape's path or the Work Path	Sleep om het pad van de actieve vorm of het werkpad te verplaatsen
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klik: ankerpunt selecteren · Slepen: ankerpunt, greep of segment verplaatsen · {shift}-klik: toevoegen · {alt}-klik: heel subpad
+	Click a segment to add an anchor point	Klik op een segment om een ankerpunt toe te voegen
+	Click an anchor point to delete it	Klik op een ankerpunt om het te verwijderen
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Klik: vloeiend punt · Klik op eerste punt: sluiten · {key} voltooien · Esc annuleren
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Sleep om uit de hand te tekenen · Klik op eerste punt: sluiten · {key} voltooien · Esc annuleren
 	Draw with the Pen tool (P) or make a work path from a selection.	Teken met het pengereedschap (P) of maak een werkpad van een selectie.
 	Drop an image or PSD anywhere to open it.	Sleep een afbeelding of PSD ergens naartoe om deze te openen.
 	Native file drag-and-drop is unavailable	Bestanden slepen en neerzetten is niet beschikbaar
@@ -1607,6 +1612,10 @@
 	Pen Pressure	Pendruk
 	Pen Tilt	Penkanteling
 	Pen Tool	Pengereedschap
+	Add Anchor Point Tool	Ankerpunt toevoegen-gereedschap
+	Curvature Pen Tool	Krommingspen-gereedschap
+	Delete Anchor Point Tool	Ankerpunt verwijderen-gereedschap
+	Freeform Pen Tool	Vrije pen-gereedschap
 	Photo	Foto
 	PhotoCraft website	Website van PhotoCraft
 	Picas	Pica's

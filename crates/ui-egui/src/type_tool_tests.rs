@@ -261,6 +261,7 @@ fn size_applies_at_layer_and_selection_scope() {
             anchor: 6,
             session: "s".into(),
             created: false,
+            mask: false,
             dragging: false,
             resize: None,
             preedit: None,
@@ -407,6 +408,7 @@ fn foreground_colour_recolours_only_selected_type() {
         anchor,
         session: "s".into(),
         created: false,
+        mask: false,
         dragging: false,
         resize: None,
         preedit: None,
@@ -447,6 +449,89 @@ fn vertical_type_tool_creates_point_and_paragraph_text_with_one_undo() {
     }
 }
 
+#[test]
+fn horizontal_type_mask_tool_leaves_a_selection_and_no_layer_in_one_undo() {
+    use crate::canvas::{ToolEvent, tool_event};
+    let mut app = new_app();
+    app.ui.tool = crate::state::Tool::HorizontalTypeMask;
+    let before = app.session.active().unwrap().history.entries().len();
+    tool_event(&mut app, ToolEvent::Down { x: 100.0, y: 100.0, pressure: 1.0 }, Modifiers::NONE);
+    tool_event(&mut app, ToolEvent::Up { x: 100.0, y: 100.0 }, Modifiers::NONE);
+    let id = LayerId(app.ui.text_edit.as_ref().unwrap().layer);
+    // Type into the transient layer, then commit the mask tool.
+    app.run("type.edit", json!({"layer": id.0, "text": "HOHO", "coalesce": app.ui.text_edit.as_ref().unwrap().session})).unwrap();
+    super::commit(&mut app);
+    let st = app.session.active().unwrap();
+    assert!(st.doc.layer(id).is_none(), "the transient type layer is gone");
+    let sel = st.doc.selection.as_ref().expect("the glyphs left a selection");
+    assert!(!sel.content_bounds().is_empty(), "the selection covers the glyphs");
+    // One undo removes the whole gesture: selection and layer together.
+    app.run("edit.undo", json!({})).unwrap();
+    let st = app.session.active().unwrap();
+    assert!(st.doc.selection.is_none(), "undo removed the selection");
+    assert_eq!(st.history.entries().len(), before, "one step for the whole gesture");
+}
+
+#[test]
+fn vertical_type_mask_tool_is_vertical_and_leaves_a_selection() {
+    use crate::canvas::{ToolEvent, tool_event};
+    use photocraft_doc::text::Orientation;
+    let mut app = new_app();
+    app.ui.tool = crate::state::Tool::VerticalTypeMask;
+    tool_event(&mut app, ToolEvent::Down { x: 100.0, y: 100.0, pressure: 1.0 }, Modifiers::NONE);
+    tool_event(&mut app, ToolEvent::Up { x: 100.0, y: 100.0 }, Modifiers::NONE);
+    let id = LayerId(app.ui.text_edit.as_ref().unwrap().layer);
+    let st = app.session.active().unwrap();
+    assert_eq!(text_layer(&st.doc, id).unwrap().orientation, Orientation::Vertical);
+    app.run("type.edit", json!({"layer": id.0, "text": "HOHO", "coalesce": app.ui.text_edit.as_ref().unwrap().session})).unwrap();
+    super::commit(&mut app);
+    let st = app.session.active().unwrap();
+    assert!(st.doc.layer(id).is_none());
+    assert!(st.doc.selection.as_ref().is_some_and(|s| !s.content_bounds().is_empty()), "vertical glyphs left a selection");
+}
+
+#[test]
+fn empty_type_mask_tool_leaves_no_selection_and_no_layer() {
+    use crate::canvas::{ToolEvent, tool_event};
+    let mut app = new_app();
+    app.ui.tool = crate::state::Tool::HorizontalTypeMask;
+    let before = app.session.active().unwrap().history.entries().len();
+    tool_event(&mut app, ToolEvent::Down { x: 100.0, y: 100.0, pressure: 1.0 }, Modifiers::NONE);
+    tool_event(&mut app, ToolEvent::Up { x: 100.0, y: 100.0 }, Modifiers::NONE);
+    let id = LayerId(app.ui.text_edit.as_ref().unwrap().layer);
+    // Clear the placeholder: committing blank type masks nothing and drops the transient layer.
+    app.run("type.edit", json!({"layer": id.0, "text": "   ", "coalesce": app.ui.text_edit.as_ref().unwrap().session})).unwrap();
+    super::commit(&mut app);
+    let st = app.session.active().unwrap();
+    assert!(st.doc.layer(id).is_none(), "the empty transient layer is gone");
+    assert!(st.doc.selection.is_none(), "blank type masks nothing");
+    assert_eq!(st.history.entries().len(), before + 1, "the create-and-discard gesture is one step");
+}
+
+/// Switching to a non-type tool commits the session *after* the tool has already changed, so the
+/// mask intent must come from the session (`TextEdit::mask`), not from the live tool. Regression:
+/// this exact flow used to commit as a normal Type tool, leaving a layer and no selection.
+#[test]
+fn type_mask_session_commits_when_the_tool_switches_away() {
+    use crate::canvas::{ToolEvent, tool_event};
+    let mut app = new_app();
+    app.ui.tool = crate::state::Tool::HorizontalTypeMask;
+    tool_event(&mut app, ToolEvent::Down { x: 100.0, y: 100.0, pressure: 1.0 }, Modifiers::NONE);
+    tool_event(&mut app, ToolEvent::Up { x: 100.0, y: 100.0 }, Modifiers::NONE);
+    let id = LayerId(app.ui.text_edit.as_ref().unwrap().layer);
+    app.run("type.edit", json!({"layer": id.0, "text": "MASK", "coalesce": app.ui.text_edit.as_ref().unwrap().session})).unwrap();
+    // The user picks another tool; the shell's commit-on-tool-switch gate (lib.rs) runs next.
+    app.ui.tool = crate::state::Tool::Move;
+    if app.ui.text_edit.is_some() && !app.ui.tool.is_type() {
+        super::commit(&mut app);
+    }
+    let st = app.session.active().unwrap();
+    assert!(st.doc.layer(id).is_none(), "the transient type layer is gone");
+    assert!(st.doc.selection.as_ref().is_some_and(|s| !s.content_bounds().is_empty()), "the glyphs left a selection");
+    app.run("edit.undo", json!({})).unwrap();
+    assert!(app.session.active().unwrap().doc.selection.is_none(), "one undo removes the selection");
+}
+
 /// #668: ⌘/Ctrl+T while typing shows or hides the Character panel, as in Photoshop, instead of
 /// starting Free Transform on the layer being typed into.
 #[test]
@@ -475,6 +560,7 @@ fn text_color_dialog_edits_only_the_selected_range_and_cancel_is_inert() {
         anchor: 6,
         session: "text-color-dialog-test".into(),
         created: false,
+        mask: false,
         dragging: false,
         resize: None,
         preedit: None,
@@ -525,7 +611,7 @@ fn empty_ime_events_never_delete_the_selection() {
     let mut app = new_app();
     let id = LayerId(app.run("type.create", json!({"text": "Hello", "size": 40, "x": 300, "y": 420})).unwrap()["layer"].as_u64().unwrap());
     app.ui.text_edit =
-        Some(crate::state::TextEdit { layer: id.0, caret: 5, anchor: 0, session: "s".into(), created: false, dragging: false, resize: None, preedit: None });
+        Some(crate::state::TextEdit { layer: id.0, caret: 5, anchor: 0, session: "s".into(), created: false, mask: false, dragging: false, resize: None, preedit: None });
     let mut h = harness(1.0, app);
     let ime = |h: &mut Harness<'static, PhotocraftApp>, e: egui::ImeEvent| {
         h.event(egui::Event::Ime(e));

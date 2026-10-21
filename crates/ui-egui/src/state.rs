@@ -87,6 +87,8 @@ pub enum Tool {
     PaintBucket,
     Type,
     VerticalType,
+    HorizontalTypeMask,
+    VerticalTypeMask,
     Hand,
     RotateView,
     Zoom,
@@ -107,6 +109,10 @@ pub enum Tool {
     QuickSelection,
     ObjectSelection,
     Pen,
+    FreeformPen,
+    CurvaturePen,
+    AddAnchorPoint,
+    DeleteAnchorPoint,
     PathSelection,
     DirectSelection,
     Rectangle,
@@ -120,7 +126,7 @@ pub enum Tool {
 }
 
 impl Tool {
-    pub const ALL: [Tool; 55] = [
+    pub const ALL: [Tool; 61] = [
         Tool::Move,
         Tool::RectMarquee,
         Tool::EllipseMarquee,
@@ -146,6 +152,8 @@ impl Tool {
         Tool::PaintBucket,
         Tool::Type,
         Tool::VerticalType,
+        Tool::HorizontalTypeMask,
+        Tool::VerticalTypeMask,
         Tool::Hand,
         Tool::RotateView,
         Tool::Zoom,
@@ -166,6 +174,10 @@ impl Tool {
         Tool::QuickSelection,
         Tool::ObjectSelection,
         Tool::Pen,
+        Tool::FreeformPen,
+        Tool::CurvaturePen,
+        Tool::AddAnchorPoint,
+        Tool::DeleteAnchorPoint,
         Tool::PathSelection,
         Tool::DirectSelection,
         Tool::Rectangle,
@@ -207,6 +219,8 @@ impl Tool {
             Tool::PaintBucket => "Paint Bucket Tool",
             Tool::Type => "Horizontal Type Tool",
             Tool::VerticalType => "Vertical Type Tool",
+            Tool::HorizontalTypeMask => "Horizontal Type Mask Tool",
+            Tool::VerticalTypeMask => "Vertical Type Mask Tool",
             Tool::Hand => "Hand Tool",
             Tool::RotateView => "Rotate View Tool",
             Tool::Zoom => "Zoom Tool",
@@ -227,6 +241,10 @@ impl Tool {
             Tool::QuickSelection => "Quick Selection Tool",
             Tool::ObjectSelection => "Object Selection Tool",
             Tool::Pen => "Pen Tool",
+            Tool::FreeformPen => "Freeform Pen Tool",
+            Tool::CurvaturePen => "Curvature Pen Tool",
+            Tool::AddAnchorPoint => "Add Anchor Point Tool",
+            Tool::DeleteAnchorPoint => "Delete Anchor Point Tool",
             Tool::PathSelection => "Path Selection Tool",
             Tool::DirectSelection => "Direct Selection Tool",
             Tool::Rectangle => "Rectangle Tool",
@@ -238,7 +256,17 @@ impl Tool {
         }
     }
     pub fn is_type(self) -> bool {
-        matches!(self, Self::Type | Self::VerticalType)
+        matches!(self, Self::Type | Self::VerticalType | Self::HorizontalTypeMask | Self::VerticalTypeMask)
+    }
+
+    /// The Horizontal/Vertical Type Mask tools: type glyphs and commit a selection, not a layer.
+    pub fn is_type_mask(self) -> bool {
+        matches!(self, Self::HorizontalTypeMask | Self::VerticalTypeMask)
+    }
+
+    /// Pen-family tools: they draw or reshape paths and share the pen editing machinery.
+    pub fn is_pen(self) -> bool {
+        matches!(self, Self::Pen | Self::FreeformPen | Self::CurvaturePen | Self::AddAnchorPoint | Self::DeleteAnchorPoint)
     }
 
     /// Retouching and painting tools that stroke with the brush (share the brush cursor and chip).
@@ -275,7 +303,7 @@ impl Tool {
             Tool::MagicWand => 'W',
             Tool::Crop | Tool::Slice | Tool::SliceSelect => 'C',
             Tool::Gradient | Tool::PaintBucket => 'G',
-            Tool::Type | Tool::VerticalType => 'T',
+            Tool::Type | Tool::VerticalType | Tool::HorizontalTypeMask | Tool::VerticalTypeMask => 'T',
             Tool::Hand => 'H',
             Tool::RotateView => 'R',
             Tool::Zoom => 'Z',
@@ -285,7 +313,7 @@ impl Tool {
             Tool::Blur | Tool::Sharpen | Tool::Smudge => '\0',
             Tool::Dodge | Tool::Burn | Tool::Sponge => 'O',
             Tool::QuickSelection | Tool::ObjectSelection => 'W',
-            Tool::Pen => 'P',
+            Tool::Pen | Tool::FreeformPen | Tool::CurvaturePen | Tool::AddAnchorPoint | Tool::DeleteAnchorPoint => 'P',
             Tool::PathSelection | Tool::DirectSelection => 'A',
             Tool::Rectangle | Tool::EllipseShape | Tool::Triangle | Tool::Polygon | Tool::Line | Tool::CustomShape => 'U',
         }
@@ -307,7 +335,8 @@ impl Tool {
             Tool::MagicWand => "W",
             Tool::Crop => "C",
             Tool::Gradient | Tool::PaintBucket => "G",
-            Tool::Type | Tool::VerticalType => "T",
+            Tool::Type | Tool::VerticalType | Tool::HorizontalTypeMask | Tool::VerticalTypeMask => "T",
+            Tool::Pen | Tool::FreeformPen | Tool::CurvaturePen | Tool::AddAnchorPoint | Tool::DeleteAnchorPoint => "⌒",
             Tool::Hand => "✋",
             Tool::RotateView => "🧭",
             Tool::Zoom => "🔍",
@@ -745,6 +774,11 @@ pub struct TextEdit {
     pub session: String,
     /// The layer was created by this session (its name follows the text; empty on commit = delete).
     pub created: bool,
+    /// The session was started by a Horizontal/Vertical Type Mask tool, so its commit renders the
+    /// glyphs to a selection instead of a layer. Recorded at session start because the tool can
+    /// change before commit runs (switching to Move commits the session first).
+    #[serde(default)]
+    pub mask: bool,
     #[serde(skip)]
     pub dragging: bool,
     /// Paragraph-box handle being dragged (0-3 corners from top-left clockwise, 4-7 top/right/bottom/left edges).
@@ -1082,7 +1116,7 @@ mod tests {
         assert!(!Tool::RedEye.is_brushlike());
         assert_eq!(Tool::from_name("patternStamp"), Some(Tool::PatternStamp));
         assert_eq!(Tool::from_name("Pattern Stamp Tool"), Some(Tool::PatternStamp));
-        assert_eq!(Tool::ALL.len(), 55);
+        assert_eq!(Tool::ALL.len(), 61);
         assert_eq!(Tool::from_name("SingleRowMarquee"), Some(Tool::SingleRowMarquee));
         assert_eq!(Tool::from_name("singleColumn"), Some(Tool::SingleColumnMarquee));
         assert_eq!(Tool::SingleRowMarquee.key(), 'M');

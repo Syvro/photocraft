@@ -353,6 +353,7 @@
 	Video Frames to Layers…	将视频帧转换为图层…
 	Rasterize	栅格化
 	Rasterize Type	栅格化文字
+	Create Selection from Type	从文字创建选区
 	Rasterize Type Layer	栅格化文字图层
 	Rasterize Shape	栅格化形状
 	New Guide Layout…	新建参考线布局…
@@ -981,6 +982,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	在图像上拖动以添加约束；按 Shift 保持水平或垂直；右键单击删除。
 	Drag to move the active shape's path or the Work Path	拖动以移动当前形状的路径或工作路径
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	单击：选择锚点 · 拖动：移动锚点、手柄或线段 · {shift}-单击：添加 · {alt}-单击：整个子路径
+	Click a segment to add an anchor point	单击段以添加锚点
+	Click an anchor point to delete it	单击锚点以将其删除
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	单击：平滑点 · 单击第一个点：闭合 · {key} 完成 · Esc 取消
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	拖动以手绘 · 单击第一个点：闭合 · {key} 完成 · Esc 取消
 	Draw with the Pen tool (P) or make a work path from a selection.	使用钢笔工具（P）绘制，或从选区创建工作路径。
 	Drop an image or PSD anywhere to open it.	将图像或 PSD 拖放到任意位置即可打开。
 	Native file drag-and-drop is unavailable	Wayland 上不支持原生文件拖放
@@ -1633,6 +1638,10 @@
 	Pen Pressure	钢笔压力
 	Pen Tilt	钢笔倾斜
 	Pen Tool	钢笔工具
+	Add Anchor Point Tool	添加锚点工具
+	Curvature Pen Tool	弯度钢笔工具
+	Delete Anchor Point Tool	删除锚点工具
+	Freeform Pen Tool	自由钢笔工具
 	Photo	照片
 	PhotoCraft website	PhotoCraft 网站
 	Picas	派卡

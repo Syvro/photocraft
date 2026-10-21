@@ -109,6 +109,22 @@ fn convert_point(s: &mut Session, p: &Value) -> Result<Value> {
     edit_path(s, CMD, p, "Convert Point", |path| edit::convert_point(path, k, out))
 }
 
+fn add_anchor(s: &mut Session, p: &Value) -> Result<Value> {
+    const CMD: &str = "path.addAnchor";
+    let k = knot(CMD, p)?;
+    let t = match p.get("t") {
+        Some(v) => v.as_f64().filter(|t| t.is_finite() && (0.0..=1.0).contains(t)).ok_or_else(|| bad(CMD, "`t` must be between 0 and 1"))?,
+        None => 0.5,
+    };
+    edit_path(s, CMD, p, "Add Anchor Point", |path| edit::insert_knot(path, k, t))
+}
+
+fn delete_anchor(s: &mut Session, p: &Value) -> Result<Value> {
+    const CMD: &str = "path.deleteAnchor";
+    let k = knot(CMD, p)?;
+    edit_path(s, CMD, p, "Delete Anchor Point", |path| edit::delete_knot(path, k))
+}
+
 pub fn specs() -> Vec<CommandSpec> {
     const TARGET: &str = r#""name":str|"work"|"layer"="work","layer":id? (with "layer": a shape layer's path or a vector mask)"#;
     let spec = |id: &'static str, label: &'static str, params: String, run: fn(&mut Session, &Value) -> Result<Value>| CommandSpec {
@@ -140,6 +156,18 @@ pub fn specs() -> Vec<CommandSpec> {
             "Convert Point",
             r#""subpath":i,"knot":j,"out":[x,y]? (none: corner with retracted handles; given: smooth with this out handle and its mirror)"#.into(),
             convert_point,
+        ),
+        spec(
+            "path.addAnchor",
+            "Add Anchor Point",
+            r#""subpath":i,"knot":j (the segment leaving it),"t":0..1=0.5 (where to split) → the curve is split exactly (de Casteljau); the new knot is smooth when either neighbour is"#.into(),
+            add_anchor,
+        ),
+        spec(
+            "path.deleteAnchor",
+            "Delete Anchor Point",
+            r#""subpath":i,"knot":j (the neighbours' tangents are extended to bridge the gap; a closed subpath reopens below three knots and the subpath is dropped below two)"#.into(),
+            delete_anchor,
         ),
     ]
 }
@@ -234,9 +262,51 @@ mod tests {
     }
 
     #[test]
+    fn add_and_delete_anchor_in_one_undoable_step() {
+        let mut s = session();
+        s.execute("path.set", json!({"path": square()})).unwrap();
+        let before = work(&s);
+        assert_eq!(before.subpaths[0].knots.len(), 4);
+        // Split the top edge (0 → 1) at its middle: a knot appears midway.
+        let r = s.execute("path.addAnchor", json!({"subpath": 0, "knot": 0, "t": 0.5})).unwrap();
+        assert_eq!(r["path"]["subpaths"][0]["knots"].as_array().unwrap().len(), 5);
+        assert_eq!(anchor(&r, 1), [35.0, 10.0]);
+        assert_eq!(s.active().unwrap().history.undo_label(), Some("Add Anchor Point"));
+        // Delete it again: back to the plain square.
+        let r = s.execute("path.deleteAnchor", json!({"subpath": 0, "knot": 1})).unwrap();
+        assert_eq!(r["path"]["subpaths"][0]["knots"].as_array().unwrap().len(), 4);
+        assert_eq!(s.active().unwrap().history.undo_label(), Some("Delete Anchor Point"));
+        assert!(s.undo() && s.undo());
+        assert_eq!(work(&s), before, "both edits undo cleanly");
+    }
+
+    #[test]
+    fn deleting_a_closed_paths_knot_keeps_it_a_path() {
+        let mut s = session();
+        s.execute("path.set", json!({"path": square()})).unwrap();
+        let r = s.execute("path.deleteAnchor", json!({"subpath": 0, "knot": 0})).unwrap();
+        assert_eq!(r["path"]["subpaths"][0]["closed"], json!(true));
+        assert_eq!(r["path"]["subpaths"][0]["knots"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn shape_paths_take_new_anchors_and_rerender() {
+        let mut s = Session::new();
+        s.execute("file.new", json!({"width": 120, "height": 100, "depth": 16})).unwrap();
+        let id = s.execute("shape.create", json!({"kind": "rect", "rect": [10, 10, 40, 40], "fill": "#ff0000"})).unwrap()["layer"].as_u64().unwrap();
+        s.execute("path.addAnchor", json!({"name": "layer", "layer": id, "subpath": 0, "knot": 0, "t": 0.5})).unwrap();
+        let st = s.active().unwrap();
+        let photocraft_doc::LayerContent::Shape(sh) = &st.doc.layer(LayerId(id)).unwrap().content else { panic!("shape") };
+        assert_eq!(sh.path.subpaths[0].knots.len(), 5);
+        assert!(sh.live.is_none(), "an edited rectangle is a plain path now");
+    }
+
+    #[test]
     fn bad_params_fail_without_an_edit() {
         let mut s = session();
         assert!(s.execute("path.moveAnchors", json!({"anchors": [[0, 0]], "move": [1, 1]})).is_err(), "no work path");
+        assert!(s.execute("path.addAnchor", json!({"subpath": 0, "knot": 0, "t": 0.5})).is_err(), "no work path");
+        assert!(s.execute("path.deleteAnchor", json!({"subpath": 0, "knot": 0})).is_err(), "no work path");
         s.execute("path.set", json!({"path": square()})).unwrap();
         let steps = s.active().unwrap().history.entries().len();
         for (id, p) in [
@@ -254,9 +324,17 @@ mod tests {
             ("path.convertPoint", json!({"subpath": 0, "knot": 0, "out": "x"})),
             ("path.convertPoint", json!({"name": "nope", "subpath": 0, "knot": 0})),
             ("path.convertPoint", json!({"name": "layer", "subpath": 0, "knot": 0})),
+            ("path.addAnchor", json!({"subpath": 0, "knot": 0, "t": 2})),
+            ("path.addAnchor", json!({"subpath": 0, "knot": 0, "t": 0})),
+            ("path.addAnchor", json!({"subpath": 0, "knot": 0, "t": 1e300})),
+            ("path.addAnchor", json!({"subpath": 9, "knot": 0, "t": 0.5})),
+            ("path.addAnchor", json!({"subpath": 0, "knot": 0, "t": "x"})),
+            ("path.deleteAnchor", json!({"subpath": 0, "knot": 9})),
+            ("path.deleteAnchor", json!({"subpath": 5, "knot": 0})),
+            ("path.deleteAnchor", json!({"name": "nope", "subpath": 0, "knot": 0})),
         ] {
             assert!(s.execute(id, p.clone()).is_err(), "{id} {p}");
         }
-        assert_eq!(s.active().unwrap().history.entries().len(), steps);
+        assert_eq!(s.active().unwrap().history.entries().len(), steps, "no edit recorded");
     }
 }

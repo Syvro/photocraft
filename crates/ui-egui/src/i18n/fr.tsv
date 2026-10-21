@@ -347,6 +347,7 @@
 	Video Frames to Layers…	Images vidéo dans des calques…
 	Rasterize	Rastériser
 	Rasterize Type	Rastériser le texte
+	Create Selection from Type	Créer une sélection à partir du texte
 	Rasterize Type Layer	Rastériser le calque de texte
 	Rasterize Shape	Rastériser la forme
 	New Guide Layout…	Nouvelle disposition de repères…
@@ -966,6 +967,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Faites glisser sur l'image pour ajouter une contrainte ; Maj pour horizontal/vertical ; clic droit pour supprimer.
 	Drag to move the active shape's path or the Work Path	Faites glisser pour déplacer le tracé de la forme active ou le tracé de travail
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Clic : sélectionner le point · Glisser : déplacer point, poignée ou segment · {shift}-clic : ajouter · {alt}-clic : sous-tracé entier
+	Click a segment to add an anchor point	Cliquez sur un segment pour ajouter un point d'ancrage
+	Click an anchor point to delete it	Cliquez sur un point d'ancrage pour le supprimer
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Clic : point lissé · Clic sur le premier point : fermer · {key} terminer · Échap annuler
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Glissez pour dessiner à main levée · Clic sur le premier point : fermer · {key} terminer · Échap annuler
 	Draw with the Pen tool (P) or make a work path from a selection.	Dessinez avec l'outil Plume (P) ou créez un tracé de travail à partir d'une sélection.
 	Drop an image or PSD anywhere to open it.	Déposez une image ou un PSD n'importe où pour l'ouvrir.
 	Duplicate Layers…	Dupliquer les calques…
@@ -1599,6 +1604,10 @@
 	Pen Pressure	Pression du stylet
 	Pen Tilt	Inclinaison du stylet
 	Pen Tool	Outil Plume
+	Add Anchor Point Tool	Outil Ajouter un point d'ancrage
+	Curvature Pen Tool	Outil Plume courbure
+	Delete Anchor Point Tool	Outil Supprimer un point d'ancrage
+	Freeform Pen Tool	Outil Plume courbe
 	Photo	Photo
 	PhotoCraft website	Site web de PhotoCraft
 	Picas	Picas

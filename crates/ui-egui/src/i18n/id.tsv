@@ -340,6 +340,7 @@
 	Video Frames to Layers…	Frame Video ke Layer…
 	Rasterize	Rasterisasi
 	Rasterize Type	Rasterisasi Teks
+	Create Selection from Type	Buat seleksi dari teks
 	Rasterize Type Layer	Rasterisasi Layer Teks
 	Rasterize Shape	Rasterisasi Bentuk
 	New Guide Layout…	Layout Panduan Baru…
@@ -960,6 +961,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Seret pada gambar untuk menambah batasan; Shift untuk horizontal/vertikal; klik kanan untuk menghapus.
 	Drag to move the active shape's path or the Work Path	Seret untuk memindah path bentuk aktif atau Work Path
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klik: pilih titik jangkar · Seret: pindahkan titik, gagang, atau segmen · {shift}-klik: tambah · {alt}-klik: seluruh subpath
+	Click a segment to add an anchor point	Klik segmen untuk menambahkan titik jangkar
+	Click an anchor point to delete it	Klik titik jangkar untuk menghapusnya
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Klik: titik halus · Klik titik pertama: tutup · {key} selesai · Esc batal
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Seret untuk menggambar bebas · Klik titik pertama: tutup · {key} selesai · Esc batal
 	Draw with the Pen tool (P) or make a work path from a selection.	Gambar dengan alat Pen (P) atau buat work path dari seleksi.
 	Drop an image or PSD anywhere to open it.	Jatuhkan gambar atau PSD di mana saja untuk membukanya.
 	Duplicate Layers…	Duplikat Layer…
@@ -1593,6 +1598,10 @@
 	Pen Pressure	Tekanan Pena
 	Pen Tilt	Kemiringan Pena
 	Pen Tool	Alat Pen
+	Add Anchor Point Tool	Alat Tambah Titik Jangkar
+	Curvature Pen Tool	Alat Pena Kurva
+	Delete Anchor Point Tool	Alat Hapus Titik Jangkar
+	Freeform Pen Tool	Alat Pena Bebas
 	Photo	Foto
 	PhotoCraft website	Situs web PhotoCraft
 	Picas	Pica

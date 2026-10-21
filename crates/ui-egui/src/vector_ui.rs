@@ -21,6 +21,10 @@ pub struct PenPath {
     /// Indices of cusp knots whose incoming and outgoing handles are not linked.
     #[serde(default)]
     pub unlinked: Vec<usize>,
+    /// Freeform Pen: the freehand stroke's pointer samples (document px); they become corner
+    /// knots when the button is released.
+    #[serde(default)]
+    pub samples: Vec<[f64; 2]>,
     #[serde(skip)]
     pub dragging: bool,
     /// Re-dragging the final anchor changes its outgoing control only; the incoming curve stays put.
@@ -185,6 +189,7 @@ pub fn pen_undo_last_point(app: &mut PhotocraftApp) -> bool {
         return false;
     }
     pen.dragging = false;
+    pen.samples.clear();
     if pen.knots.is_empty() {
         app.ui.pen = None;
     }
@@ -225,6 +230,147 @@ pub fn pen_commit(app: &mut PhotocraftApp, closed: bool) {
         app.ui.status = e;
         app.ui.status_error = true;
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Freeform Pen
+
+/// Ramer–Douglas–Peucker simplification: the traced samples that actually shape the stroke.
+fn simplify(pts: &[[f64; 2]], eps: f64) -> Vec<[f64; 2]> {
+    if pts.len() < 3 {
+        return pts.to_vec();
+    }
+    let mut keep = vec![false; pts.len()];
+    if let Some(first) = keep.first_mut() {
+        *first = true;
+    }
+    if let Some(last) = keep.last_mut() {
+        *last = true;
+    }
+    let mut stack = vec![(0usize, pts.len() - 1)];
+    while let Some((a, b)) = stack.pop() {
+        if b <= a + 1 {
+            continue;
+        }
+        let (Some(p), Some(q)) = (pts.get(a).copied(), pts.get(b).copied()) else { continue };
+        let (dx, dy) = (q[0] - p[0], q[1] - p[1]);
+        let len = dx.hypot(dy);
+        let (mut best, mut best_d) = (a, 0.0f64);
+        for (i, r) in pts.iter().enumerate().take(b).skip(a + 1) {
+            let d = if len < 1e-9 {
+                (r[0] - p[0]).hypot(r[1] - p[1])
+            } else {
+                ((r[0] - p[0]) * dy - (r[1] - p[1]) * dx).abs() / len
+            };
+            if d > best_d {
+                best_d = d;
+                best = i;
+            }
+        }
+        if best_d > eps {
+            if let Some(k) = keep.get_mut(best) {
+                *k = true;
+            }
+            stack.push((a, best));
+            stack.push((best, b));
+        }
+    }
+    pts.iter().zip(&keep).filter(|(_, k)| **k).map(|(p, _)| *p).collect()
+}
+
+/// The Freeform Pen's stroke becomes retracted corner knots passing exactly through its
+/// simplified trace, so the committed path is the line the user drew.
+fn freeform_knots(samples: &[[f64; 2]]) -> Vec<[[f64; 2]; 3]> {
+    simplify(samples, 1.0).into_iter().map(|p| [p; 3]).collect()
+}
+
+/// Freeform Pen press: clicking the first anchor closes the path; otherwise a freehand stroke
+/// starts (or continues the path being drawn).
+pub fn freeform_down(app: &mut PhotocraftApp, x: f64, y: f64) {
+    let tol = 6.0 / app.current_zoom().max(0.01) as f64;
+    let pen = app.ui.pen.get_or_insert_with(PenPath::default);
+    if let Some(first) = pen.knots.first().map(|k| k[0])
+        && pen.knots.len() >= 2
+        && (first[0] - x).hypot(first[1] - y) < tol
+    {
+        pen_commit(app, true);
+        return;
+    }
+    pen.samples = vec![[x, y]];
+    pen.dragging = true;
+    pen.adjusting_last = false;
+}
+
+/// Freeform Pen drag: collect the stroke's samples, but only once the pointer has actually
+/// moved a document pixel or two, so a resting drag doesn't pile them up.
+pub fn freeform_move(app: &mut PhotocraftApp, x: f64, y: f64) {
+    let step = 2.0 / f64::from(app.current_zoom().max(0.01));
+    if let Some(pen) = app.ui.pen.as_mut()
+        && pen.dragging
+        && let Some(last) = pen.samples.last()
+        && (last[0] - x).hypot(last[1] - y) >= step
+    {
+        pen.samples.push([x, y]);
+    }
+}
+
+/// Freeform Pen release: the traced stroke becomes knots appended to the path in progress. A
+/// click without movement is a single anchor, like a Pen click.
+pub fn freeform_up(app: &mut PhotocraftApp) {
+    let Some(pen) = app.ui.pen.as_mut() else { return };
+    pen.dragging = false;
+    pen.adjusting_last = false;
+    if pen.samples.is_empty() {
+        return;
+    }
+    let knots = freeform_knots(&pen.samples);
+    pen.samples.clear();
+    pen.knots.extend(knots);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Curvature Pen
+
+/// Turn every interior knot smooth through its neighbours: each pair of handles splits the
+/// chord to the previous and next anchors in sixths, so the curve flows through every click.
+fn curvature_smooth(pen: &mut PenPath) {
+    let n = pen.knots.len();
+    pen.unlinked.clear();
+    for i in 0..n {
+        let prev = i.checked_sub(1).and_then(|j| pen.knots.get(j)).map(|k| k[0]);
+        let next = pen.knots.get(i + 1).map(|k| k[0]);
+        let Some(k) = pen.knots.get_mut(i) else { break };
+        match (prev, next) {
+            (Some(p), Some(nx)) => {
+                let a = k[0];
+                let d = [(nx[0] - p[0]) / 6.0, (nx[1] - p[1]) / 6.0];
+                k[1] = [a[0] - d[0], a[1] - d[1]];
+                k[2] = [a[0] + d[0], a[1] + d[1]];
+            }
+            _ => {
+                k[1] = k[0];
+                k[2] = k[0];
+            }
+        }
+    }
+}
+
+/// Curvature Pen press: each click adds a smooth point the curve passes through; clicking the
+/// first anchor closes the path. There is nothing to drag: the shape comes from the clicks.
+pub fn curvature_down(app: &mut PhotocraftApp, x: f64, y: f64) {
+    let tol = 6.0 / app.current_zoom().max(0.01) as f64;
+    let pen = app.ui.pen.get_or_insert_with(PenPath::default);
+    if let Some(first) = pen.knots.first().map(|k| k[0])
+        && pen.knots.len() >= 2
+        && (first[0] - x).hypot(first[1] - y) < tol
+    {
+        pen_commit(app, true);
+        return;
+    }
+    pen.knots.push([[x, y]; 3]);
+    curvature_smooth(pen);
+    pen.dragging = false;
+    pen.adjusting_last = false;
 }
 
 /// The path that path commands act on without a name: the one selected in the Paths panel, else
@@ -427,7 +573,7 @@ pub(crate) fn draw_handle(painter: &egui::Painter, anchor: Pos2, handle: Pos2, a
 /// Work path / active shape path outlines, anchors, and the pen path in progress.
 pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, doc: &Document) {
     let tool = app.ui.tool;
-    let vector_tool = matches!(tool, Tool::Pen | Tool::PathSelection) || is_shape_tool(tool);
+    let vector_tool = tool.is_pen() || tool == Tool::PathSelection || is_shape_tool(tool);
     let accent = Tokens::get(painter.ctx()).accent;
     let to_scr = |q: [f64; 2]| xf.to_screen(q[0] as f32, q[1] as f32);
     let draw_path = |p: &Path, anchors: bool| {
@@ -470,6 +616,11 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             }
         }
         painter.add(egui::Shape::line(pts, Stroke::new(1.5, accent)));
+        // The Freeform Pen's stroke in progress: its trail of samples.
+        if pen.samples.len() >= 2 {
+            let trail: Vec<Pos2> = pen.samples.iter().map(|p| to_scr(*p)).collect();
+            painter.add(egui::Shape::line(trail, Stroke::new(1.5, accent)));
+        }
         if let (Some(last), Some(h)) = (pen.knots.last(), app.hover_doc)
             && !pen.dragging
         {
@@ -493,7 +644,7 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
 
 /// Options bar for vector tools; false for other tools.
 pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bool {
-    if !(is_shape_tool(tool) || matches!(tool, Tool::Pen | Tool::PathSelection | Tool::DirectSelection)) {
+    if !(is_shape_tool(tool) || tool.is_pen() || matches!(tool, Tool::PathSelection | Tool::DirectSelection)) {
         return false;
     }
     let t = Tokens::get(ui.ctx());
@@ -516,16 +667,30 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
         );
         return true;
     }
-    if tool == Tool::Pen {
+    if matches!(tool, Tool::Pen | Tool::FreeformPen | Tool::CurvaturePen) {
         let opts = [("path".to_string(), tl!("Path")), ("shape".to_string(), tl!("Shape"))];
         crate::widgets::dropdown(ui, "pen-mode", &mut o.vector_mode, &opts, 80.0);
         crate::widgets::vline(ui, 22.0);
+        let hint = match tool {
+            Tool::FreeformPen => {
+                crate::i18n::fmt(tl!("Drag to draw freehand · Click first point: close · {key} finish · Esc cancel"), &[("key", &crate::shortcuts::pretty("Enter"))])
+            }
+            Tool::CurvaturePen => {
+                crate::i18n::fmt(tl!("Click: smooth point · Click first point: close · {key} finish · Esc cancel"), &[("key", &crate::shortcuts::pretty("Enter"))])
+            }
+            _ => crate::i18n::fmt(tl!("Click: corner · Drag: smooth · Click first point: close · {key} finish · Esc cancel"), &[("key", &crate::shortcuts::pretty("Enter"))]),
+        };
+        lbl(ui, &hint);
+        return true;
+    }
+    if matches!(tool, Tool::AddAnchorPoint | Tool::DeleteAnchorPoint) {
         lbl(
             ui,
-            &crate::i18n::fmt(
-                tl!("Click: corner · Drag: smooth · Click first point: close · {key} finish · Esc cancel"),
-                &[("key", &crate::shortcuts::pretty("Enter"))],
-            ),
+            if tool == Tool::AddAnchorPoint {
+                tl!("Click a segment to add an anchor point")
+            } else {
+                tl!("Click an anchor point to delete it")
+            },
         );
         return true;
     }
@@ -1169,10 +1334,56 @@ mod tests {
     }
 
     #[test]
+    fn freeform_pen_traces_a_stroke_into_a_work_path() {
+        let mut app = app();
+        app.ui.tool = Tool::FreeformPen;
+        freeform_down(&mut app, 20.0, 20.0);
+        for (x, y) in [(40.0, 20.0), (80.0, 20.0), (80.0, 80.0), (20.0, 80.0)] {
+            freeform_move(&mut app, x, y);
+        }
+        freeform_up(&mut app);
+        assert!(app.ui.pen.as_ref().is_some_and(|p| p.knots.len() >= 3), "the trace became knots");
+        pen_commit(&mut app, false);
+        assert!(app.ui.pen.is_none());
+        let wp = app.session.active().unwrap().doc.work_path.clone().unwrap();
+        assert!(!wp.subpaths[0].closed && wp.subpaths[0].knots.len() >= 3);
+    }
+
+    #[test]
+    fn freeform_pen_clicking_the_first_anchor_closes_the_path() {
+        let mut app = app();
+        app.ui.tool = Tool::FreeformPen;
+        freeform_down(&mut app, 20.0, 20.0);
+        for (x, y) in [(120.0, 20.0), (120.0, 120.0)] {
+            freeform_move(&mut app, x, y);
+        }
+        freeform_up(&mut app);
+        freeform_down(&mut app, 20.5, 20.5);
+        assert!(app.ui.pen.is_none(), "clicking the first anchor commits");
+        let wp = app.session.active().unwrap().doc.work_path.clone().unwrap();
+        assert!(wp.subpaths[0].closed);
+    }
+
+    #[test]
+    fn curvature_pen_smooths_every_interior_knot() {
+        let mut app = app();
+        app.ui.tool = Tool::CurvaturePen;
+        for (x, y) in [(20.0, 20.0), (120.0, 20.0), (120.0, 120.0)] {
+            curvature_down(&mut app, x, y);
+        }
+        let pen = app.ui.pen.as_ref().unwrap();
+        assert_eq!(pen.knots[1][0], [120.0, 20.0], "the click position is the anchor");
+        assert!((pen.knots[1][2][0] - (120.0 + 50.0 / 3.0)).abs() < 1e-9, "out handle = anchor + (next - prev)/6");
+        assert!((pen.knots[1][1][0] - (120.0 - 50.0 / 3.0)).abs() < 1e-9, "in handle mirrors it");
+        pen_commit(&mut app, false);
+        let wp = app.session.active().unwrap().doc.work_path.clone().unwrap();
+        assert!(wp.subpaths[0].knots[1].smooth);
+    }
+
+    #[test]
     fn pen_builds_and_closes_a_work_path() {
         let mut app = app();
-        app.ui.tool = Tool::Pen;
-        for (x, y) in [(20.0, 20.0), (120.0, 20.0)] {
+        app.ui.tool = Tool::Pen;        for (x, y) in [(20.0, 20.0), (120.0, 20.0)] {
             pen_down(&mut app, x, y);
             pen_up(&mut app);
         }

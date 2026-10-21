@@ -111,6 +111,20 @@ issue = 213
 note = "Tool::PatternStamp in the S group; paint.patternStamp stamps the Patterns-panel tile with Aligned and Impressionist (an approximation: it jitters each dab's tile phase, not Photoshop's smeared impressionist look); engine tests cover depths, seams, hostile input"
 
 [[item]]
+id = "TOOL-213-19"
+target = "Horizontal/Vertical Type Mask tools: the typed glyphs become a selection, not a layer"
+status = "done"
+issue = 213
+note = "Tool::HorizontalTypeMask / Tool::VerticalTypeMask in the T flyout; type.mask (type_mask_cmds.rs) renders the type layer to an anti-aliased coverage mask and combines it with the selection (replace/add/subtract/intersect); the transient type layer is deleted inside the create's coalesced step, so one undo removes the gesture and the selection; also Type > Create Selection from Type; engine 7 tests at 8/16/32-bit, 3 UI tests, panic_hunt green"
+
+[[item]]
+id = "TOOL-213-20"
+target = "Freeform Pen, Curvature Pen, Add Anchor Point and Delete Anchor Point tools in the P flyout"
+status = "done"
+issue = 213
+note = "Tool::{FreeformPen,CurvaturePen,AddAnchorPoint,DeleteAnchorPoint} in the P group; Freeform traces a pointer stroke into a work path simplified with Ramer-Douglas-Peucker (eps = 1 px) and closes on the first anchor; Curvature adds a smooth knot per click with interior handles = anchor +/- (next - prev)/6; Add/Delete Anchor Point click a segment to split it or an anchor to remove it, through path.addAnchor / path.deleteAnchor (path_edit_cmds.rs) over vector insert_knot (de Casteljau) / delete_knot (neighbours extended 4/3, closed reopens at 2 knots, subpath dropped below 2); graphics live in crates/vector/src/edit.rs (de Casteljau split, neighbour extension), UI in vector_ui.rs and add_delete_anchor.rs; vector 2 + engine 3 + UI 6 tests, panic_hunt green"
+
+[[item]]
 id = "TOOL-214-1"
 target = "Select and Mask workspace: view modes, Refine Edge brush, 6 outputs"
 status = "partial"
@@ -178,7 +192,7 @@ id = "TOOL-214-10"
 target = "Pen: Alt breaks a handle, Shift 45 deg, Ctrl direct-selects, Backspace, close-drag handle"
 status = "partial"
 issue = 214
-note = "Ctrl/Cmd = Direct Selection and Alt = Convert Point on existing paths (direct_select.rs, #790); no Shift 45 deg, Backspace or Alt while drawing"
+note = "Ctrl/Cmd = Direct Selection and Alt = Convert Point on existing paths (direct_select.rs, #790); no Shift 45 deg, Backspace or Alt while drawing. The 4 siblings (Freeform, Curvature, Add/Delete Anchor Point) live in TOOL-213-20"
 
 [[item]]
 id = "TOOL-214-11"

@@ -353,6 +353,7 @@
 	Video Frames to Layers…	ビデオフレームをレイヤーへ…
 	Rasterize	ラスタライズ
 	Rasterize Type	文字をラスタライズ
+	Create Selection from Type	文字選択範囲を作成
 	Rasterize Type Layer	文字レイヤーをラスタライズ
 	Rasterize Shape	シェイプをラスタライズ
 	New Guide Layout…	新規ガイドレイアウト…
@@ -981,6 +982,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	画像上をドラッグして制約を追加。Shift で水平/垂直、右クリックで削除。
 	Drag to move the active shape's path or the Work Path	ドラッグして、アクティブなシェイプのパスまたは作業用パスを移動
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	クリック: アンカーポイントを選択 · ドラッグ: ポイント、ハンドル、セグメントを移動 · {shift}+クリック: 追加 · {alt}+クリック: サブパス全体
+	Click a segment to add an anchor point	セグメントをクリックしてアンカーポイントを追加
+	Click an anchor point to delete it	アンカーポイントをクリックして削除
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	クリック: スムーズポイント · 最初のポイントをクリック: 閉じる · {key} で終了 · Esc でキャンセル
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	ドラッグでフリーハンド描画 · 最初のポイントをクリック: 閉じる · {key} で終了 · Esc でキャンセル
 	Draw with the Pen tool (P) or make a work path from a selection.	ペンツール(P)で描くか、選択範囲から作業用パスを作成します。
 	Drop an image or PSD anywhere to open it.	画像や PSD をここにドロップすると開きます。
 	Native file drag-and-drop is unavailable	Wayland ではネイティブのファイルドラッグ＆ドロップを利用できません
@@ -1625,6 +1630,10 @@
 	Pen Pressure	ペンの筆圧
 	Pen Tilt	ペンの傾き
 	Pen Tool	ペンツール
+	Add Anchor Point Tool	アンカーポイント追加ツール
+	Curvature Pen Tool	曲線ペンツール
+	Delete Anchor Point Tool	アンカーポイント削除ツール
+	Freeform Pen Tool	フリーフォームペンツール
 	Photo	写真
 	PhotoCraft website	PhotoCraft の Web サイト
 	Picas	パイカ

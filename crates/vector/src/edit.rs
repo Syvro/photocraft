@@ -167,6 +167,81 @@ pub fn bend_segment(path: &mut Path, knot: [usize; 2], t: f64, d: [f64; 2]) -> R
     Ok(())
 }
 
+/// Splits the segment leaving `[s, k]` at curve parameter `t` and inserts a new knot there,
+/// exactly on the curve (de Casteljau). The original segment's two halves keep the shape; the
+/// new knot's handles are the inner control points of each half, so it starts smooth. This is
+/// the Add Anchor Point tool.
+pub fn insert_knot(path: &mut Path, [s, k]: [usize; 2], t: f64) -> Result<(), String> {
+    if !(0.0..=1.0).contains(&t) || !t.is_finite() {
+        return Err("`t` must be between 0 and 1".into());
+    }
+    // (0, 1) — at an end the "split" degenerates onto an existing knot.
+    if t <= 1e-6 || t >= 1.0 - 1e-6 {
+        return Err("`t` must be strictly between 0 and 1".into());
+    }
+    let end = segment_end(path, [s, k])?;
+    let sp = path.subpaths.get_mut(s).ok_or_else(|| format!("no subpath {s}"))?;
+    let i = k;
+    let j = end[1];
+    let a = sp.knots.get(i).ok_or_else(|| format!("no knot {i} in subpath {s}"))?;
+    let b = sp.knots.get(j).ok_or_else(|| format!("no knot {j} in subpath {s}"))?;
+    let (p0, c1, c2, p1) = (a.anchor, a.out_ctrl, b.in_ctrl, b.anchor);
+    // de Casteljau: the two inner controls that bound the split.
+    let lerp = |u: Point, v: Point| Point::new(u.x + (v.x - u.x) * t, u.y + (v.y - u.y) * t);
+    let ab = lerp(p0, c1);
+    let bc = lerp(c1, c2);
+    let cd = lerp(c2, p1);
+    let abc = lerp(ab, bc);
+    let bcd = lerp(bc, cd);
+    let mid = lerp(abc, bcd);
+    let smooth = a.smooth || b.smooth;
+    // First half is [p0, ab, abc, mid]; second is [mid, bcd, cd, p1]. Knot i's out handle
+    // becomes `ab`, knot j's in handle `cd`; the new knot holds the inner controls abc/bcd.
+    sp.knots.get_mut(i).ok_or_else(|| format!("no knot {i} in subpath {s}"))?.out_ctrl = ab;
+    sp.knots.get_mut(j).ok_or_else(|| format!("no knot {j} in subpath {s}"))?.in_ctrl = cd;
+    let new = Knot { anchor: mid, in_ctrl: abc, out_ctrl: bcd, smooth };
+    sp.knots.insert(i + 1, new);
+    Ok(())
+}
+
+/// Removes knot `k` of subpath `s` (the Delete Anchor Point tool), keeping the shape as close as
+/// a single cubic can: the neighbouring tangents are extended by 4/3 to meet the removed point's
+/// span. The subpath is dropped if it falls below two knots (three when closed).
+pub fn delete_knot(path: &mut Path, [s, k]: [usize; 2]) -> Result<(), String> {
+    let sp = path.subpaths.get_mut(s).ok_or_else(|| format!("no subpath {s}"))?;
+    let n = sp.knots.len();
+    if k >= n {
+        return Err(format!("no knot {k} in subpath {s}"));
+    }
+    let min = if sp.closed { 3 } else { 2 };
+    if n < min {
+        return Err(format!("a {} subpath needs at least {min} knots", if sp.closed { "closed" } else { "open" }));
+    }
+    let prev = if k == 0 { if sp.closed { n - 1 } else { usize::MAX } } else { k - 1 };
+    let next = if k + 1 < n { k + 1 } else { if sp.closed { 0 } else { usize::MAX } };
+    if prev != usize::MAX && next != usize::MAX {
+        // Interior (or wrapping on a closed subpath): rebuild one cubic from prev to next.
+        let (pa, po) = (sp.knots[prev].anchor, sp.knots[prev].out_ctrl);
+        let (na, ni) = (sp.knots[next].anchor, sp.knots[next].in_ctrl);
+        let ext = |from: Point, handle: Point| Point::new(from.x + (handle.x - from.x) * 4.0 / 3.0, from.y + (handle.y - from.y) * 4.0 / 3.0);
+        let (po, ni) = (ext(pa, po), ext(na, ni));
+        // Guard against a degenerate tangent that would throw the curve far away.
+        let far = |p: Point| p.x.abs() > 1e6 || p.y.abs() > 1e6 || !p.x.is_finite() || !p.y.is_finite();
+        sp.knots[prev].out_ctrl = if far(po) { pa } else { po };
+        sp.knots[next].in_ctrl = if far(ni) { na } else { ni };
+    }
+    // An endpoint of an open subpath just goes; the remaining endpoint keeps its own handles.
+    sp.knots.remove(k);
+    if sp.knots.len() < if sp.closed { 3 } else { 2 } {
+        // Closed subpaths fall back to open when only two knots remain.
+        sp.closed = false;
+    }
+    if sp.knots.len() < 2 {
+        path.subpaths.remove(s);
+    }
+    Ok(())
+}
+
 /// Every anchor of subpath `s` (⌥-click with Direct Selection selects the whole subpath).
 pub fn subpath_anchors(path: &Path, s: usize) -> Vec<[usize; 2]> {
     path.subpaths.get(s).map_or_else(Vec::new, |sp| (0..sp.knots.len()).map(|k| [s, k]).collect())
@@ -337,5 +412,74 @@ mod tests {
         assert_eq!(anchors_in(&p, [110.0, -5.0, 40.0, 5.0]), vec![[0, 1]]);
         assert_eq!(subpath_anchors(&p, 0), vec![[0, 0], [0, 1], [0, 2]]);
         assert!(subpath_anchors(&p, 4).is_empty());
+    }
+
+    #[test]
+    fn inserting_a_knot_splits_the_segment_without_moving_the_curve() {
+        let mut p = curve();
+        let orig = p.clone();
+        let seg = |p: &Path| p.subpaths[0].segments()[0];
+        insert_knot(&mut p, [0, 0], 0.5).unwrap();
+        assert_eq!(p.subpaths[0].knots.len(), 4, "a knot was inserted after the first");
+        let k = at(&p, 0, 1);
+        let on_curve = eval(&seg(&orig), 0.5);
+        assert!(dist(k.anchor, on_curve) < 1e-9, "the anchor sits on the curve: {k:?} vs {on_curve:?}");
+        assert!(k.smooth, "the split knot inherits smoothness from its neighbours");
+        let halves = p.subpaths[0].segments();
+        assert_eq!(halves.len(), 3);
+        assert!(dist(eval(&halves[0], 1.0), k.anchor) < 1e-9, "the first half ends at the new anchor");
+        // The two halves trace the original curve exactly.
+        let full = orig.subpaths[0].segments()[0];
+        for i in 0..=10 {
+            let t = i as f64 / 10.0;
+            let half = if t <= 0.5 { eval(&halves[0], t * 2.0) } else { eval(&halves[1], (t - 0.5) * 2.0) };
+            let d = dist(half, eval(&full, t));
+            assert!(d < 1e-9, "t={t}: half={half:?} full={:?} d={d}", eval(&full, t));
+        }
+    }
+
+    #[test]
+    fn deleting_an_endpoint_trims_and_deleting_a_lone_subpath_removes_it() {
+        let open = Subpath::polyline(&[(0.0, 0.0), (50.0, 0.0), (100.0, 0.0)]);
+        let mut p = Path::new(vec![open.clone()]);
+        delete_knot(&mut p, [0, 0]).unwrap();
+        assert_eq!(p.subpaths[0].knots.len(), 2);
+        assert_eq!(at(&p, 0, 0).anchor, Point::new(50.0, 0.0), "the new first keeps its place");
+        delete_knot(&mut p, [0, 1]).unwrap();
+        assert!(p.subpaths.is_empty(), "a subpath below two knots is dropped");
+        assert!(delete_knot(&mut p, [0, 0]).is_err(), "no subpath left");
+        let mut p = Path::new(vec![open]);
+        assert!(delete_knot(&mut p, [0, 9]).is_err(), "out of range");
+    }
+
+    #[test]
+    fn deleting_a_closed_knot_keeps_the_loop_and_reopens_at_two() {
+        let mut p = Path::new(vec![Subpath::polygon(&[(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)])]);
+        delete_knot(&mut p, [0, 0]).unwrap();
+        assert_eq!(p.subpaths[0].knots.len(), 3);
+        assert!(p.subpaths[0].closed, "still a triangle");
+        // The two neighbours are bridged by extended tangents (corners: straight again).
+        assert_eq!(at(&p, 0, 2).anchor, Point::new(0.0, 100.0));
+        assert_eq!(at(&p, 0, 0).anchor, Point::new(100.0, 0.0));
+        assert_eq!(at(&p, 0, 2).out_ctrl, at(&p, 0, 2).anchor, "corner: retracted");
+        delete_knot(&mut p, [0, 0]).unwrap();
+        assert!(!p.subpaths[0].closed, "two knots can't stay closed");
+        assert_eq!(p.subpaths[0].knots.len(), 2);
+    }
+
+    #[test]
+    fn inserting_and_deleting_reject_bad_input_without_touching_the_path() {
+        let mut p = curve();
+        let before = p.clone();
+        for t in [-1.0, 2.0, f64::NAN, 0.0, 1.0] {
+            assert!(insert_knot(&mut p, [0, 0], t).is_err(), "t={t}");
+        }
+        assert!(insert_knot(&mut p, [3, 0], 0.5).is_err());
+        assert!(insert_knot(&mut p, [0, 9], 0.5).is_err());
+        assert_eq!(p, before, "nothing changed");
+        let mut tiny = Path::new(vec![Subpath::polyline(&[(0.0, 0.0), (10.0, 0.0)])]);
+        assert!(delete_knot(&mut tiny, [0, 0]).is_ok(), "two knots → one → dropped");
+        let mut one = Path::new(vec![Subpath::polyline(&[(0.0, 0.0)])]);
+        assert!(delete_knot(&mut one, [0, 0]).is_err(), "nothing to delete");
     }
 }

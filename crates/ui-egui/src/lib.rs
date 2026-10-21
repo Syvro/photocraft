@@ -15,6 +15,7 @@ macro_rules! tl {
 }
 
 pub mod actions;
+pub mod add_delete_anchor;
 pub mod adjust_dialog;
 pub mod adjust_editors;
 pub mod adjust_preview;
@@ -1087,7 +1088,7 @@ impl eframe::App for PhotocraftApp {
         if self.ui.text_edit.is_some() && !self.ui.tool.is_type() {
             type_tool::commit(self);
         }
-        if self.ui.pen.is_some() && self.ui.tool != state::Tool::Pen {
+        if self.ui.pen.is_some() && !matches!(self.ui.tool, state::Tool::Pen | state::Tool::FreeformPen | state::Tool::CurvaturePen) {
             vector_ui::pen_commit(self, false);
         }
         transform_tool::end_if_left(self);

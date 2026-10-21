@@ -161,6 +161,7 @@
 	Export Contents…	Экспортировать содержимое…
 	Rasterize	Растрировать
 	Rasterize Type	Растрировать текст
+	Create Selection from Type	Создать выделенную область из текста
 	Rasterize Shape	Растрировать фигуру
 	New Adjustment Layer	Новый корректирующий слой
 	New Fill Layer	Новый слой-заливка
@@ -1097,6 +1098,10 @@
 	Create new shape from the current path	Создать новую фигуру из текущего контура
 	Drag to move the active shape's path or the Work Path	Перетащите, чтобы переместить контур активной фигуры или рабочий контур
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Щелчок: выбрать узел · Перетаскивание: переместить узел, маркер или сегмент · {shift}-щелчок: добавить · {alt}-щелчок: весь подконтур
+	Click a segment to add an anchor point	Щёлкните сегмент, чтобы добавить узел
+	Click an anchor point to delete it	Щёлкните узел, чтобы удалить его
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Щелчок: сглаженный узел · Щелчок по первой точке: замкнуть · {key} — завершить · Esc — отмена
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Перетаскивайте для рисования от руки · Щелчок по первой точке: замкнуть · {key} — завершить · Esc — отмена
 	Draw with the Pen tool (P) or make a work path from a selection.	Нарисуйте пером (P) или создайте рабочий контур из выделения.
 
 # Clone Source panel
@@ -1511,6 +1516,10 @@
 	Quick Selection Tool	Быстрое выделение
 	Object Selection Tool	Выделение объектов
 	Pen Tool	Перо
+	Add Anchor Point Tool	Добавить узел
+	Curvature Pen Tool	Кривизна пера
+	Delete Anchor Point Tool	Удалить узел
+	Freeform Pen Tool	Свободное перо
 	Path Selection Tool	Выделение контура
 	Direct Selection Tool	Выделение узла
 	Rectangle Tool	Прямоугольник

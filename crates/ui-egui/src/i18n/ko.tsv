@@ -335,6 +335,7 @@
 	Video Frames to Layers…	비디오 프레임을 레이어로…
 	Rasterize	래스터화
 	Rasterize Type	문자 래스터화
+	Create Selection from Type	문자에서 선택 영역 만들기
 	Rasterize Type Layer	문자 레이어 래스터화
 	Rasterize Shape	모양 래스터화
 	New Guide Layout…	새 안내선 레이아웃…
@@ -958,6 +959,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	이미지 위에서 드래그하여 제약 조건 추가; Shift 키로 수평/수직 유지; 오른쪽 클릭하여 삭제.
 	Drag to move the active shape's path or the Work Path	드래그하여 활성 모양의 패스 또는 작업 패스 이동
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	클릭: 기준점 선택 · 드래그: 기준점, 핸들 또는 세그먼트 이동 · {shift}-클릭: 추가 · {alt}-클릭: 하위 패스 전체
+	Click a segment to add an anchor point	세그먼트를 클릭하여 앵커 포인트 추가
+	Click an anchor point to delete it	앵커 포인트를 클릭하여 삭제
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	클릭: 매끄러운 점 · 첫 점 클릭: 닫기 · {key} 완료 · Esc 취소
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	드래그하여 자유롭게 그리기 · 첫 점 클릭: 닫기 · {key} 완료 · Esc 취소
 	Draw with the Pen tool (P) or make a work path from a selection.	펜 도구(P)로 그리거나 선택 영역에서 작업 패스를 만드세요.
 	Drop an image or PSD anywhere to open it.	이미지나 PSD를 아무 곳에나 놓아 여세요.
 	Duplicate Layers…	레이어 복제…
@@ -1595,6 +1600,10 @@
 	Pen Pressure	펜 압력
 	Pen Tilt	펜 기울기
 	Pen Tool	펜 도구
+	Add Anchor Point Tool	앵커 포인트 추가 도구
+	Curvature Pen Tool	곡률 펜 도구
+	Delete Anchor Point Tool	앵커 포인트 삭제 도구
+	Freeform Pen Tool	자유형 펜 도구
 	Photo	사진
 	PhotoCraft website	PhotoCraft 웹사이트
 	Picas	파이카

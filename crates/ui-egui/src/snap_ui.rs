@@ -96,6 +96,10 @@ fn is_point_tool(t: Tool) -> bool {
             | Tool::Crop
             | Tool::ObjectSelection
             | Tool::Pen
+            | Tool::FreeformPen
+            | Tool::CurvaturePen
+            | Tool::AddAnchorPoint
+            | Tool::DeleteAnchorPoint
             | Tool::Rectangle
             | Tool::EllipseShape
             | Tool::Triangle
@@ -103,6 +107,8 @@ fn is_point_tool(t: Tool) -> bool {
             | Tool::Line
             | Tool::Type
             | Tool::VerticalType
+            | Tool::HorizontalTypeMask
+            | Tool::VerticalTypeMask
     )
 }
 
@@ -197,7 +203,19 @@ fn begin(app: &mut PhotocraftApp, p: [f64; 2]) {
 /// the pixel grid.
 fn pixel_round(app: &PhotocraftApp, p: [f64; 2]) -> [f64; 2] {
     if app.session.prefs().tools.snap_vector_tools_and_transforms_to_pixel_grid
-        && matches!(app.ui.tool, Tool::Pen | Tool::Rectangle | Tool::EllipseShape | Tool::Triangle | Tool::Polygon | Tool::Line)
+        && matches!(
+            app.ui.tool,
+            Tool::Pen
+                | Tool::FreeformPen
+                | Tool::CurvaturePen
+                | Tool::AddAnchorPoint
+                | Tool::DeleteAnchorPoint
+                | Tool::Rectangle
+                | Tool::EllipseShape
+                | Tool::Triangle
+                | Tool::Polygon
+                | Tool::Line
+        )
     {
         [p[0].round(), p[1].round()]
     } else {

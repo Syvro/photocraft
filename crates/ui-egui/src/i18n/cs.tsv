@@ -357,6 +357,7 @@
 	Video Frames to Layers…	Snímky videa do vrstev…
 	Rasterize	Rastrovat
 	Rasterize Type	Rastrovat text
+	Create Selection from Type	Vytvořit výběr z textu
 	Rasterize Type Layer	Rastrovat textovou vrstvu
 	Rasterize Shape	Rastrovat tvar
 	New Guide Layout…	Nové rozvržení vodítek…
@@ -991,6 +992,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Tažením v obraze přidáte omezení; Shift pro vodorovné/svislé; pravým kliknutím odstraníte.
 	Drag to move the active shape's path or the Work Path	Tažením přesunete cestu aktivního tvaru nebo pracovní cestu
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klik: vybrat bod · Tažení: přesunout bod, úchyt nebo segment · {shift}+klik: přidat · {alt}+klik: celá podcesta
+	Click a segment to add an anchor point	Kliknutím na segment přidáte kotevní bod
+	Click an anchor point to delete it	Kliknutím na kotevní bod jej odeberete
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Kliknutí: hladký bod · Kliknutí na první bod: zavřít · {key} dokončit · Esc zrušit
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Tažením kreslíte od ruky · Kliknutí na první bod: zavřít · {key} dokončit · Esc zrušit
 	Draw with the Pen tool (P) or make a work path from a selection.	Kreslete nástrojem pero (P) nebo vytvořte pracovní cestu z výběru.
 	Drop an image or PSD anywhere to open it.	Přetáhněte sem obrázek nebo PSD a otevře se.
 	Native file drag-and-drop is unavailable	Nativní přetahování souborů ve Waylandu není dostupné
@@ -1636,6 +1641,10 @@
 	Pen Pressure	Přítlak pera
 	Pen Tilt	Náklon pera
 	Pen Tool	Nástroj pero
+	Add Anchor Point Tool	Nástroj přidat kotevní bod
+	Curvature Pen Tool	Nástroj pero zakřivení
+	Delete Anchor Point Tool	Nástroj odebrat kotevní bod
+	Freeform Pen Tool	Nástroj pero od ruky
 	Photo	Fotografie
 	PhotoCraft website	Web PhotoCraft
 	Picas	Pica

@@ -1769,6 +1769,7 @@
 	Delete Frame	Διαγραφή καρέ
 	Duplicate Frame	Διπλασιασμός καρέ
 	Rasterize Type	Ραστεροποίηση κειμένου
+	Create Selection from Type	Δημιουργία επιλογής από κείμενο
 	Rasterize Type Layer	Ραστεροποίηση επιπέδου κειμένου
 	Rasterize Shape	Ραστεροποίηση σχήματος
 	New Guide Layout…	Νέα διάταξη οδηγών…
@@ -2063,6 +2064,10 @@
 	Click to zoom in  ·  {key}-click to zoom out  ·  drag right/left to zoom in/out	Κλικ για μεγέθυνση · {key}-κλικ για σμίκρυνση · σύρσιμο δεξιά/αριστερά για αλλαγή μεγέθυνσης
 	Click: corner · Drag: smooth · Click first point: close · {key} finish · Esc cancel	Κλικ: γωνία · Σύρσιμο: εξομάλυνση · Κλικ στο πρώτο σημείο: κλείσιμο · {key}: τέλος · Esc: ακύρωση
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Κλικ: επιλογή σημείου αγκύρωσης · Σύρσιμο: μετακίνηση σημείου, λαβής ή τμήματος · {shift}-κλικ: προσθήκη · {alt}-κλικ: ολόκληρη υποδιαδρομή
+	Click a segment to add an anchor point	Κάντε κλικ σε ένα τμήμα για προσθήκη σημείου αγκύρωσης
+	Click an anchor point to delete it	Κάντε κλικ σε ένα σημείο αγκύρωσης για διαγραφή του
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Κλικ: ομαλό σημείο · Κλικ στο πρώτο σημείο: κλείσιμο · {key} ολοκλήρωση · Esc ακύρωση
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Σύρετε για ελεύθερη σχεδίαση · Κλικ στο πρώτο σημείο: κλείσιμο · {key} ολοκλήρωση · Esc ακύρωση
 	Clip to layer below	Περικοπή στο υποκείμενο επίπεδο
 	Clipped	Περικομμένο
 	Clipping Path	Διαδρομή αποκοπής
@@ -3183,6 +3188,10 @@ cameraRaw	Yellow	Κίτρινο
 	Path Selection Tool	Επιλογή διαδρομής (Path Selection Tool)
 	Direct Selection Tool	Άμεση επιλογή (Direct Selection Tool)
 	Pen Tool	Πένα (Pen Tool)
+	Add Anchor Point Tool	Προσθήκη σημείου αγκύρωσης (Add Anchor Point Tool)
+	Curvature Pen Tool	Πένα καμπυλότητας (Curvature Pen Tool)
+	Delete Anchor Point Tool	Διαγραφή σημείου αγκύρωσης (Delete Anchor Point Tool)
+	Freeform Pen Tool	Ελεύθερη πένα (Freeform Pen Tool)
 	Polygon Tool	Πολύγωνο (Polygon Tool)
 	Polygonal Lasso Tool	Πολυγωνικό λάσο (Polygonal Lasso Tool)
 	Quick Selection Tool	Γρήγορη επιλογή (Quick Selection Tool)

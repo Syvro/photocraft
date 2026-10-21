@@ -349,6 +349,7 @@
 	Video Frames to Layers…	Fotogramas de vídeo a capas…
 	Rasterize	Rasterizar
 	Rasterize Type	Rasterizar texto
+	Create Selection from Type	Crear selección a partir del texto
 	Rasterize Type Layer	Rasterizar capa de texto
 	Rasterize Shape	Rasterizar forma
 	New Guide Layout…	Nuevo diseño de guías…
@@ -976,6 +977,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Arrastre sobre la imagen para añadir una restricción; Mayús para horizontal/vertical; clic derecho para eliminar.
 	Drag to move the active shape's path or the Work Path	Arrastre para mover el trazado de la forma activa o el Trazado de trabajo
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Clic: seleccionar punto · Arrastrar: mover punto, manejador o segmento · {shift}-clic: añadir · {alt}-clic: subtrazado completo
+	Click a segment to add an anchor point	Haga clic en un segmento para añadir un punto de ancla
+	Click an anchor point to delete it	Haga clic en un punto de ancla para eliminarlo
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Clic: punto suavizado · Clic en el primer punto: cerrar · {key} finalizar · Esc cancelar
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Arrastre para dibujar a mano alzada · Clic en el primer punto: cerrar · {key} finalizar · Esc cancelar
 	Draw with the Pen tool (P) or make a work path from a selection.	Dibuja con la herramienta Pluma (P) o crea un trazado de trabajo a partir de una selección.
 	Drop an image or PSD anywhere to open it.	Suelte una imagen o un PSD en cualquier lugar para abrirlo.
 	Native file drag-and-drop is unavailable	El arrastrar y soltar archivos de forma nativa no está disponible en Wayland
@@ -1620,6 +1625,10 @@
 	Pen Pressure	Presión del lápiz
 	Pen Tilt	Inclinación del lápiz
 	Pen Tool	Herramienta Pluma
+	Add Anchor Point Tool	Herramienta Añadir punto de ancla
+	Curvature Pen Tool	Herramienta Pluma de curvatura
+	Delete Anchor Point Tool	Herramienta Eliminar punto de ancla
+	Freeform Pen Tool	Herramienta Pluma flexible
 	Photo	Fotografía
 	PhotoCraft website	Sitio web de PhotoCraft
 	Picas	Picas

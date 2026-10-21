@@ -351,6 +351,7 @@
 	Video Frames to Layers…	Klatki wideo do warstw…
 	Rasterize	Rasteryzuj
 	Rasterize Type	Rasteryzuj tekst
+	Create Selection from Type	Utwórz zaznaczenie z tekstu
 	Rasterize Type Layer	Rasteryzuj warstwę tekstową
 	Rasterize Shape	Rasteryzuj kształt
 	New Guide Layout…	Nowy układ prowadnic…
@@ -980,6 +981,10 @@
 	Drag on the image to add a constraint; Shift for horizontal/vertical; right-click to delete.	Przeciągnij po obrazie, aby dodać ograniczenie; Shift — poziomo/pionowo; prawy przycisk usuwa.
 	Drag to move the active shape's path or the Work Path	Przeciągnij, aby przesunąć ścieżkę aktywnego kształtu lub ścieżkę roboczą
 	Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath	Klik: zaznacz punkt kontrolny · Przeciągnięcie: przesuń punkt, uchwyt lub segment · {shift}-klik: dodaj · {alt}-klik: cała podścieżka
+	Click a segment to add an anchor point	Kliknij segment, aby dodać punkt kontrolny
+	Click an anchor point to delete it	Kliknij punkt kontrolny, aby go usunąć
+	Click: smooth point · Click first point: close · {key} finish · Esc cancel	Kliknięcie: punkt gładki · Kliknięcie pierwszego punktu: zamknij · {key} zakończ · Esc anuluj
+	Drag to draw freehand · Click first point: close · {key} finish · Esc cancel	Przeciągnij, aby rysować odręcznie · Kliknięcie pierwszego punktu: zamknij · {key} zakończ · Esc anuluj
 	Draw with the Pen tool (P) or make a work path from a selection.	Rysuj narzędziem Pióro (P) lub utwórz ścieżkę roboczą z zaznaczenia.
 	Drop an image or PSD anywhere to open it.	Upuść obraz lub plik PSD w dowolnym miejscu, aby go otworzyć.
 	Native file drag-and-drop is unavailable	Natywne przeciąganie plików jest niedostępne
@@ -1617,6 +1622,10 @@
 	Pen Pressure	Nacisk pióra
 	Pen Tilt	Nachylenie pióra
 	Pen Tool	Narzędzie Pióro
+	Add Anchor Point Tool	Narzędzie Dodaj punkt kontrolny
+	Curvature Pen Tool	Narzędzie Pióro krzywizny
+	Delete Anchor Point Tool	Narzędzie Usuń punkt kontrolny
+	Freeform Pen Tool	Narzędzie Pióro odręczne
 	Photo	Zdjęcie
 	PhotoCraft website	Strona internetowa PhotoCraft
 	Picas	Pikasy

@@ -1,6 +1,7 @@
 //! Lucide icons (ISC licence), embedded and tinted at runtime.
 
 pub static ICONS: &[(&str, &[u8])] = &[
+    ("add-anchor-point", include_bytes!("../../../assets/icons/add-anchor-point.svg")),
     ("adjustment-layer", include_bytes!("../../../assets/icons/adjustment-layer.svg")),
     ("align-center", include_bytes!("../../../assets/icons/align-center.svg")),
     ("align-justify", include_bytes!("../../../assets/icons/align-justify.svg")),
@@ -31,6 +32,8 @@ pub static ICONS: &[(&str, &[u8])] = &[
     ("contrast", include_bytes!("../../../assets/icons/contrast.svg")),
     ("copy", include_bytes!("../../../assets/icons/copy.svg")),
     ("crop", include_bytes!("../../../assets/icons/crop.svg")),
+    ("curvature-pen", include_bytes!("../../../assets/icons/curvature-pen.svg")),
+    ("delete-anchor-point", include_bytes!("../../../assets/icons/delete-anchor-point.svg")),
     ("diamond", include_bytes!("../../../assets/icons/diamond.svg")),
     ("direct-select", include_bytes!("../../../assets/icons/direct-select.svg")),
     ("droplet", include_bytes!("../../../assets/icons/droplet.svg")),
@@ -47,6 +50,7 @@ pub static ICONS: &[(&str, &[u8])] = &[
     ("folder", include_bytes!("../../../assets/icons/folder.svg")),
     ("folder-open", include_bytes!("../../../assets/icons/folder-open.svg")),
     ("folder-plus", include_bytes!("../../../assets/icons/folder-plus.svg")),
+    ("freeform-pen", include_bytes!("../../../assets/icons/freeform-pen.svg")),
     ("gauge", include_bytes!("../../../assets/icons/gauge.svg")),
     ("grid-2x2", include_bytes!("../../../assets/icons/grid-2x2.svg")),
     ("grid-3x3", include_bytes!("../../../assets/icons/grid-3x3.svg")),
@@ -116,6 +120,7 @@ pub static ICONS: &[(&str, &[u8])] = &[
     ("triangle-alert", include_bytes!("../../../assets/icons/triangle-alert.svg")),
     ("triangle-right", include_bytes!("../../../assets/icons/triangle-right.svg")),
     ("type", include_bytes!("../../../assets/icons/type.svg")),
+    ("type-mask", include_bytes!("../../../assets/icons/type-mask.svg")),
     ("undo-2", include_bytes!("../../../assets/icons/undo-2.svg")),
     ("unlink", include_bytes!("../../../assets/icons/unlink.svg")),
     ("wand", include_bytes!("../../../assets/icons/wand.svg")),
