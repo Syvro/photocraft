@@ -190,9 +190,9 @@ note = "Ratio dropdown and fields only (panels.rs:551-579)"
 [[item]]
 id = "TOOL-214-10"
 target = "Pen: Alt breaks a handle, Shift 45 deg, Ctrl direct-selects, Backspace, close-drag handle"
-status = "partial"
+status = "done"
 issue = 214
-note = "Ctrl/Cmd = Direct Selection and Alt = Convert Point on existing paths (direct_select.rs, #790); no Shift 45 deg, Backspace or Alt while drawing. The 4 siblings (Freeform, Curvature, Add/Delete Anchor Point) live in TOOL-213-20"
+note = "Ctrl/Cmd = Direct Selection and Alt = Convert Point on existing paths (direct_select.rs, #790); Ctrl/Cmd+Z or Backspace/Delete retract the pending anchor (shortcuts.rs, #1466); ⇧ snaps the dragged handle (and its segment) to 45 deg; Alt while placing an anchor breaks the handle into a corner (vector_ui.rs snap_45, PenPath.breaking); re-clicking the last anchor re-drags its outgoing handle only (#1482). Tests in vector_ui.rs. The 4 siblings (Freeform, Curvature, Add/Delete Anchor Point) live in TOOL-213-20"
 
 [[item]]
 id = "TOOL-214-11"

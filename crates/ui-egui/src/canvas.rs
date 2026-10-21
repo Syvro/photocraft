@@ -3354,7 +3354,7 @@ fn tool_move(app: &mut PhotocraftApp, x: f64, y: f64, pressure: f32, mods: egui:
         crate::type_tool::pointer_move(app, x, y);
     }
     if tool == Tool::Pen {
-        crate::vector_ui::pen_move(app, x, y);
+        crate::vector_ui::pen_move(app, x, y, mods);
     }
     if tool == Tool::FreeformPen {
         crate::vector_ui::freeform_move(app, x, y);
@@ -3562,7 +3562,7 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
             }
             match tool {
                 Tool::Pen => {
-                    crate::vector_ui::pen_down(app, x, y);
+                    crate::vector_ui::pen_down(app, x, y, mods);
                     return;
                 }
                 Tool::FreeformPen => {
