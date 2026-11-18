@@ -1270,3 +1270,27 @@ fn type_options_bar_exposes_path_offset_and_flip() {
         "flip button"
     );
 }
+
+#[test]
+fn caret_hit_test_follows_the_curved_path() {
+    let mut app = new_app();
+    app.run("path.set", json!({"name": "work", "path": {"subpaths": [{"knots": [
+        {"anchor": [100, 300], "in": [100, 300], "out": [100, 220], "smooth": true},
+        {"anchor": [300, 100], "in": [220, 100], "out": [300, 100], "smooth": true}
+    ]}]}})).unwrap();
+    let id = app.run("type.create", json!({"text": "abcdefghij", "x": 100, "y": 300})).unwrap()["layer"].as_u64().unwrap();
+    app.run("type.path.attach", json!({"layer": id, "path": "work"})).unwrap();
+    let id = LayerId(id);
+    let (l, aff, _) = super::layout(&mut app, id).unwrap();
+    let path = Some(super::path_map(&app, id).expect("path map"));
+    let c = l.clusters.get(4).expect("cluster").clone();
+    let baseline = l.lines[c.line].baseline;
+    let (mx, my) = super::map_text_point(&l, &path, c.x + c.advance * 0.25, baseline);
+    let p = aff.apply(Point::new(mx, my));
+    let off = super::hit_offset(&mut app, id, p.x, p.y);
+    assert_eq!(off, c.range.start, "click on the curve lands on the caret before that cluster");
+    let (x, top, bot) = l.caret(c.range.start);
+    let a = super::map_text_point(&l, &path, x, top);
+    let b = super::map_text_point(&l, &path, x, bot);
+    assert!((a.0 - b.0).abs() > 0.5, "caret is rotated by the curve normal: {a:?} {b:?}");
+}

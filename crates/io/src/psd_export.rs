@@ -1281,7 +1281,7 @@ fn document_to_psd_nested(doc: &Document, opts: &PsdExportOptions, depth: u32) -
         resources.push(ImageResource::new(ids::EXIF, photocraft_codecs::export_exif(e, ppi).into_owned()));
     }
     let mut global_blocks = Vec::new();
-    for (sig, key, data) in &ex.smart.finish(crate::annotations_map::export_blocks(doc, crate::pattern_map::export_global_blocks(doc))) {
+    for (sig, key, data) in &ex.smart.finish(crate::annotations_map::export_blocks(doc, path_txt2_global_blocks(doc, &mut ex.warnings))) {
         let mut tb = TaggedBlock::new(*key, data.to_vec());
         tb.signature = *sig;
         // Photoshop pads document-level (global) blocks to a multiple of 4, and readers such as
@@ -1375,6 +1375,36 @@ fn mask_parameters(user: Option<(f32, f32)>, vector: Option<(f32, f32)>) -> Opti
         | u8::from(p.vector_density.is_some()) << 2
         | u8::from(p.vector_feather.is_some()) << 3;
     (flags != 0).then_some(MaskParameters { flags, ..p })
+}
+
+fn path_txt2_global_blocks(doc: &Document, warnings: &mut Vec<String>) -> Vec<photocraft_doc::PsdGlobalBlock> {
+    let mut updates = Vec::new();
+    for (_, _, layer) in doc.walk() {
+        if let LayerContent::Text(t) = &layer.content
+            && let (Some(binding), Some(raw)) = (t.path.as_ref(), t.psd_raw.as_deref())
+            && let Some(index) = photocraft_text::psd::txt2_text_index(raw)
+        {
+            updates.push((index, binding, &t.transform));
+        }
+    }
+    let mut blocks = crate::pattern_map::export_global_blocks(doc);
+    if updates.is_empty() {
+        return blocks;
+    }
+    let Some(pos) = blocks.iter().position(|b| &b.1 == b"Txt2") else {
+        warnings.push("Photoshop path text: Txt2 global block was removed; the path binding could not be written".to_string());
+        return blocks;
+    };
+    let Some(txt2) = photocraft_text::psd::parse_txt2(&blocks[pos].2) else {
+        warnings.push("Photoshop path text: Txt2 global block could not be parsed; the path binding was preserved unchanged".to_string());
+        return blocks;
+    };
+    if let Some(data) = photocraft_text::psd::txt2_with_paths(&txt2, &updates) {
+        blocks[pos].2 = std::sync::Arc::new(data);
+    } else {
+        warnings.push("Photoshop path text: Txt2 path resource could not be updated".to_string());
+    }
+    blocks
 }
 
 #[cfg(test)]

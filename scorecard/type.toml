@@ -7,9 +7,9 @@ order = 5
 [[item]]
 id = "TYPE-218-1"
 target = "Type on a path: path shape, glyphs along the curve, caret follows, PSD round trip"
-status = "partial"
+status = "done"
 issue = 218
-note = "2026-11-17: core path type landed — TextPathBinding in doc/text.rs (path/subpath/start/offset/flip, Work or Saved source + inverse transform), PathMeasure in doc/path_measure.rs, PathMap applied to glyph outlines in text/render.rs; type.path.attach/detach/align/offset/flip/info/reflow in engine/type_path_cmds.rs with reflow on path edits; Type-tool click attaches, options bar has path/offset/flip; .pcraft round trip via format crate; PSD Txt2 round trip and caret/selection overlay following the curve remain open"
+note = "2026-11-18: path shape, glyphs along the curve, caret/selection overlay and PSD round trip are covered. TextPathBinding in doc/text.rs, PathMeasure in doc/path_measure.rs, PathMap in text/render.rs; type.path commands reflow on path edits; Type-tool click attaches with path/offset/flip options; .pcraft round trip via format crate; PSD Txt2 path import/write verified with path-circle and path-wave-open corpus tests, with caret hit-test following the curve."
 
 [[item]]
 id = "TYPE-218-2"

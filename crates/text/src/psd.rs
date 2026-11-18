@@ -11,8 +11,9 @@
 
 use photocraft_color::{Color, ColorMode};
 use photocraft_doc::TextLayer;
-use photocraft_doc::text::{AntiAlias, Caps, CharStyle, Kerning, Orientation, ParagraphRun, ParagraphStyle, TextAlign, TextRun, TextShape, TextWarp};
-use photocraft_geom::Affine;
+use photocraft_doc::text::{AntiAlias, Caps, CharStyle, Kerning, Orientation, ParagraphRun, ParagraphStyle, TextAlign, TextPathBinding, TextRun, TextShape, TextWarp};
+use photocraft_doc::vector::{Knot, Path, Subpath};
+use photocraft_geom::{Affine, Point};
 use photocraft_psd::descriptor::{Descriptor, Id, UnicodeString, Value as D, VersionedDescriptor};
 
 use crate::engine_data::{self as ed, Value as E};
@@ -124,6 +125,200 @@ pub fn parse_txt2(data: &[u8]) -> Option<E> {
     ed::parse(&wrapped).ok().filter(|v| matches!(v, E::Dict(_)))
 }
 
+const MAX_TXT2_POINTS: usize = 8192;
+
+pub fn txt2_text_index(tysh: &[u8]) -> Option<usize> {
+    let t = parse_tysh(tysh)?;
+    match t.text.get("TextIndex") {
+        Some(D::Integer(i)) => usize::try_from(*i).ok(),
+        _ => None,
+    }
+}
+
+fn txt2_object(txt2: &E, index: usize) -> Option<&E> {
+    txt2.path(&["1", "1"]).and_then(E::as_array).and_then(|a| a.get(index))
+}
+
+fn txt2_object_mut(txt2: &mut E, index: usize) -> Option<&mut E> {
+    txt2.get_mut("1")?.get_mut("1")?.as_array_mut()?.get_mut(index)
+}
+
+fn txt2_resource_index(object: &E) -> Option<usize> {
+    usize::try_from(object.path(&["1", "2"]).and_then(E::as_array)?.first()?.get("5")?.as_i64()?).ok()
+}
+
+fn txt2_resource_mut(txt2: &mut E, index: usize) -> Option<&mut E> {
+    txt2.get_mut("0")?.get_mut("8")?.get_mut("0")?.as_array_mut()?.get_mut(index)
+}
+
+fn txt2_resource_inner(txt2: &E, index: usize) -> Option<&E> {
+    txt2.path(&["0", "8", "0"]).and_then(E::as_array)?.get(index)?.get("0")
+}
+
+fn ensure_dict(node: &mut E) -> &mut E {
+    if !matches!(node, E::Dict(_)) {
+        *node = E::Dict(Vec::new());
+    }
+    node
+}
+
+fn ensure_child<'a>(node: &'a mut E, key: &str) -> Option<&'a mut E> {
+    ensure_dict(node).get_mut(key)
+}
+
+fn txt2_flat_points(binding: &TextPathBinding, transform: &Affine) -> Vec<Point> {
+    let path = binding.path.transform(transform);
+    let Some(subpath) = path.subpaths.get(binding.subpath) else {
+        return Vec::new();
+    };
+    let mut out = Vec::with_capacity(subpath.segments().len().saturating_mul(4));
+    for seg in subpath.segments() {
+        for p in seg {
+            if !p.x.is_finite() || !p.y.is_finite() || out.len() >= MAX_TXT2_POINTS {
+                return Vec::new();
+            }
+            out.push(p);
+        }
+    }
+    out
+}
+
+fn write_bare_txt2(txt2: &E) -> Option<Vec<u8>> {
+    let bytes = ed::write(txt2);
+    let start = bytes.iter().position(|b| *b == b'<')?.checked_add(2)?;
+    let end = bytes.iter().rposition(|b| *b == b'>')?.checked_sub(2)?;
+    Some(bytes[start..end].to_vec())
+}
+
+pub fn txt2_with_paths(txt2: &E, updates: &[(usize, &TextPathBinding, &Affine)]) -> Option<Vec<u8>> {
+    let mut out = txt2.clone();
+    let mut changed = false;
+    for (index, binding, transform) in updates {
+        let object = txt2_object(txt2, *index)?;
+        let existing = txt2_resource_index(object);
+        let points = txt2_flat_points(binding, transform);
+        if points.is_empty() {
+            return None;
+        }
+        let inverse = transform.inverse()?;
+        let unchanged = existing
+            .and_then(|i| txt2_resource_inner(txt2, i))
+            .is_some_and(|r| {
+                let old = txt2_points(r);
+                old.as_ref().is_some_and(|p| {
+                    p.len() == points.len() && p.iter().zip(&points).all(|(a, b)| (a.x - b.x).abs() < 1e-3 && (a.y - b.y).abs() < 1e-3)
+                })
+            });
+        if unchanged {
+            continue;
+        }
+        changed = true;
+        let affine = E::Array(inverse.m.iter().map(|v| E::Real(*v)).collect());
+        let floats = points.iter().flat_map(|p| [E::Real(p.x), E::Real(p.y)]).collect();
+        let resource_index = {
+            let resources = out.get_mut("0")?.get_mut("8")?.get_mut("0")?;
+            let list = resources.as_array_mut()?;
+            match existing {
+                Some(i) if i < list.len() => i,
+                Some(_) => return None,
+                None => {
+                    list.push(E::Dict(Vec::new()));
+                    list.len() - 1
+                }
+            }
+        };
+        {
+            let resource = txt2_resource_mut(&mut out, resource_index)?;
+            let resource = ensure_child(resource, "0")?;
+            let point_node = ensure_child(resource, "1")?;
+            point_node.set("0", E::Array(floats));
+            let affine_node = ensure_child(ensure_child(resource, "2")?, "2")?;
+            *affine_node = affine;
+        }
+        {
+            let object = txt2_object_mut(&mut out, *index)?;
+            if txt2_resource_index(object).is_none() {
+                let props = ensure_child(object, "1")?;
+                props.set("2", E::Array(vec![E::Dict(vec![("5".to_string(), E::Real(resource_index as f64))])]));
+            }
+        }
+    }
+    if changed {
+        write_bare_txt2(&out)
+    } else {
+        None
+    }
+}
+
+fn txt2_text_matches(layer: &TextLayer, object: &E) -> bool {
+    let Some(text) = object.get("0").and_then(|m| m.get("0")).and_then(E::as_str) else {
+        return false;
+    };
+    text.strip_suffix('\r').unwrap_or(text).replace('\r', "\n") == layer.text
+}
+
+fn nums(v: Option<&E>) -> Vec<f64> {
+    v.and_then(E::as_array).map(|a| a.iter().filter_map(E::as_f64).collect()).unwrap_or_default()
+}
+
+fn txt2_affine(resource: &E) -> Option<Affine> {
+    let a = nums(resource.path(&["2", "2"]));
+    let m: [f64; 6] = a.get(..6)?.try_into().ok()?;
+    m.iter().all(|v| v.is_finite()).then_some(Affine { m })
+}
+
+fn txt2_points(resource: &E) -> Option<Vec<Point>> {
+    let nums = nums(resource.path(&["1", "0"]));
+    if nums.len() < 8 || !nums.len().is_multiple_of(2) || nums.len() > MAX_TXT2_POINTS {
+        return None;
+    }
+    if !nums.iter().all(|v| v.is_finite()) {
+        return None;
+    }
+    Some(nums.as_chunks::<2>().0.iter().map(|p| Point::new(p[0], p[1])).collect())
+}
+
+fn txt2_path(points: &[Point]) -> Option<Path> {
+    if points.len() < 4 || !points.len().is_multiple_of(4) {
+        return None;
+    }
+    let segments = points.len() / 4;
+    let closed = (points[0].x - points[points.len() - 1].x).abs() < 1e-3 && (points[0].y - points[points.len() - 1].y).abs() < 1e-3;
+    let mut knots = Vec::with_capacity(if closed { segments } else { segments + 1 });
+    for i in 0..segments {
+        let anchor = points[i * 4];
+        let in_ctrl = if i > 0 {
+            points[i * 4 - 2]
+        } else if closed {
+            points[(segments - 1) * 4 + 2]
+        } else {
+            anchor
+        };
+        let out_ctrl = points[i * 4 + 1];
+        knots.push(Knot::smooth(anchor, in_ctrl, out_ctrl));
+    }
+    if !closed {
+        let anchor = points[points.len() - 1];
+        knots.push(Knot::smooth(anchor, points[points.len() - 2], anchor));
+    }
+    Some(Path::new(vec![Subpath { closed, knots, ..Default::default() }]))
+}
+
+pub fn txt2_path_binding(layer: &TextLayer, tysh: &[u8], txt2: &E) -> Option<TextPathBinding> {
+    let object = txt2_object(txt2, txt2_text_index(tysh)?)?;
+    if !txt2_text_matches(layer, object) {
+        return None;
+    }
+    let resource_index = usize::try_from(object.path(&["1", "2"]).and_then(E::as_array)?.first()?.get("5")?.as_i64()?).ok()?;
+    let resource = txt2.path(&["0", "8", "0"]).and_then(E::as_array)?.get(resource_index)?.get("0")?;
+    let points = txt2_points(resource)?;
+    let path = txt2_path(&points)?.transform(&txt2_affine(resource)?);
+    if path.is_empty() {
+        return None;
+    }
+    Some(TextPathBinding { path, ..Default::default() })
+}
+
 /// Applies the automatic kerning modes that Photoshop keeps only in `Txt2` (EngineData writes
 /// Optical and "0" alike as `AutoKerning true`) to `layer`, read from `tysh`. Only when the
 /// layer's `TextIndex` entry still holds the layer's text (an edit elsewhere leaves `Txt2`
@@ -134,6 +329,9 @@ pub fn parse_txt2(data: &[u8]) -> Option<E> {
 /// `<< /0 << /0 << … /6 <<style>> >> >> /1 utf16-length >>`; style key `/11` is the auto-kern
 /// mode of the pair after each character: 0 manual, 1 metrics, 2 optical.
 pub fn apply_txt2(layer: &mut TextLayer, tysh: &[u8], txt2: &E) {
+    if layer.path.is_none() {
+        layer.path = txt2_path_binding(layer, tysh, txt2);
+    }
     let Some(index) = parse_tysh(tysh).and_then(|t| match t.text.get("TextIndex") {
         Some(D::Integer(i)) => usize::try_from(*i).ok(),
         _ => None,

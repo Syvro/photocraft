@@ -76,6 +76,12 @@ impl Value {
             _ => None,
         }
     }
+    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
+        match self {
+            Value::Array(a) => Some(a),
+            _ => None,
+        }
+    }
     pub fn dict() -> Value {
         Value::Dict(Vec::new())
     }

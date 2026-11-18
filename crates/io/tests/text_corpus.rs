@@ -189,3 +189,85 @@ fn created_text_layer_roundtrips_through_psd() {
     assert_eq!(bt.transform, t.transform);
     assert!(bt.cache.as_ref().is_some_and(|c| c.content_bounds().width() > 10));
 }
+
+#[cfg(feature = "corpus")]
+#[test]
+fn corpus_txt2_path_text_imports() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/photoshop/text");
+    for (file, closed, knots) in [("path-circle.psd", true, 4), ("path-wave-open.psd", false, 3)] {
+        let bytes = std::fs::read(dir.join(file)).unwrap();
+        let doc = photocraft_io::import(file, &bytes).unwrap().document;
+        let raw = doc.metadata.psd_global_blocks.iter().find(|b| &b.1 == b"Txt2").map(|b| b.2.clone()).expect("Txt2 global block");
+        assert!(photocraft_text::psd::parse_txt2(&raw).is_some());
+        let mut all = Vec::new();
+        walk(&doc.layers, &mut all);
+        let layers: Vec<_> = all.into_iter().filter_map(|l| match &l.content { LayerContent::Text(t) => Some(t), _ => None }).collect();
+        assert_eq!(layers.len(), 1, "{file}: one type layer");
+        let binding = layers[0].path.as_ref().unwrap_or_else(|| panic!("{file}: Txt2 path was not imported"));
+        assert_eq!(binding.path.subpaths.len(), 1, "{file}");
+        assert_eq!(binding.path.subpaths[0].closed, closed, "{file}");
+        assert_eq!(binding.path.subpaths[0].knots.len(), knots, "{file}");
+        assert!(binding.source.is_none() && binding.subpath == 0, "{file}");
+        let b = binding.path.control_bounds().expect("path bounds");
+        assert!(b.2 - b.0 > 100.0 && b.3 - b.1 > 10.0, "{file}: {b:?}");
+        assert!(photocraft_text::path::PathMap::new(binding).is_some(), "{file}: measurable path");
+        let out = photocraft_io::export(&doc, "out.psd", &Default::default()).unwrap();
+        let back = photocraft_io::import("out.psd", &out.bytes).unwrap().document;
+        let raw_back = back.metadata.psd_global_blocks.iter().find(|b| &b.1 == b"Txt2").map(|b| b.2.clone()).expect("Txt2 survives export");
+        assert_eq!(raw, raw_back, "{file}: Txt2 is preserved byte-for-byte");
+        let mut all = Vec::new();
+        walk(&back.layers, &mut all);
+        assert!(all.iter().any(|l| matches!(&l.content, LayerContent::Text(t) if t.path.is_some())), "{file}: path survives re-import");
+    }
+}
+
+#[cfg(feature = "corpus")]
+#[test]
+fn corpus_txt2_path_geometry_edits_roundtrip() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/photoshop/text");
+    fn first_text_path(layers: &[Layer], path: &mut Vec<usize>) -> bool {
+        for (i, l) in layers.iter().enumerate() {
+            path.push(i);
+            if matches!(l.content, LayerContent::Text(_)) {
+                return true;
+            }
+            if l.children().is_some_and(|ch| first_text_path(ch, path)) {
+                return true;
+            }
+            path.pop();
+        }
+        false
+    }
+    let bytes = std::fs::read(dir.join("path-circle.psd")).unwrap();
+    let mut doc = photocraft_io::import("path-circle.psd", &bytes).unwrap().document;
+    let original = {
+        let mut all = Vec::new();
+        walk(&doc.layers, &mut all);
+        let t = all.iter().find_map(|l| match &l.content { LayerContent::Text(t) => Some(t), _ => None }).expect("fixture text layer");
+        t.path.as_ref().expect("Txt2 path").path.control_bounds().expect("bounds")
+    };
+    let mut path = Vec::new();
+    assert!(first_text_path(&doc.layers, &mut path), "fixture text layer");
+    let mut node = &mut doc.layers;
+    for &i in &path[..path.len() - 1] {
+        node = node[i].children_mut().expect("child layers");
+    }
+    let LayerContent::Text(t) = &mut node[path[path.len() - 1]].content else {
+        panic!("fixture text layer")
+    };
+    let binding = t.path.as_mut().expect("Txt2 path");
+    binding.path = binding.path.transform(&photocraft_geom::Affine::translate(20.0, 10.0));
+    let out = photocraft_io::export(&doc, "out.psd", &Default::default()).unwrap();
+    assert!(!out.warnings.iter().any(|w| w.contains("Txt2")), "{:?}", out.warnings);
+    let back = photocraft_io::import("out.psd", &out.bytes).unwrap().document;
+    let changed = {
+        let mut all = Vec::new();
+        walk(&back.layers, &mut all);
+        let t = all.iter().find_map(|l| match &l.content { LayerContent::Text(t) => Some(t), _ => None }).expect("fixture text layer");
+        t.path.as_ref().expect("Txt2 path after export").path.control_bounds().expect("bounds after export")
+    };
+    assert!((changed.0 - original.0 - 20.0).abs() < 1e-3, "{original:?} -> {changed:?}");
+    assert!((changed.1 - original.1 - 10.0).abs() < 1e-3, "{original:?} -> {changed:?}");
+    assert!((changed.2 - original.2 - 20.0).abs() < 1e-3, "{original:?} -> {changed:?}");
+    assert!((changed.3 - original.3 - 10.0).abs() < 1e-3, "{original:?} -> {changed:?}");
+}

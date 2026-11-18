@@ -11,6 +11,7 @@ use photocraft_doc::path_measure::PathMeasure;
 use photocraft_doc::{Document, LayerContent, LayerId, Path, TextLayer};
 use photocraft_geom::{Affine, Point};
 use photocraft_text::TextLayout;
+use photocraft_text::path::PathMap;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -45,6 +46,18 @@ pub fn layout(app: &mut PhotocraftApp, id: LayerId) -> Option<(Arc<TextLayout>, 
     let l = Arc::new(photocraft_text::shared().lock().ok()?.layout(t, doc.resolution_dpi));
     app.type_layout = Some((key, l.clone()));
     Some((l, transform, t.text.clone()))
+}
+
+fn path_map(app: &PhotocraftApp, id: LayerId) -> Option<PathMap> {
+    app.session.active().and_then(|s| text_layer(&s.doc, id)).and_then(|t| t.path.as_ref()).and_then(PathMap::new)
+}
+
+fn map_text_point(l: &TextLayout, path: &Option<PathMap>, x: f32, y: f32) -> (f64, f64) {
+    let (x, y) = l.to_text(x, y);
+    match path {
+        Some(p) => p.apply(x as f64, y as f64),
+        None => (x as f64, y as f64),
+    }
 }
 
 fn to_text(aff: &Affine, x: f64, y: f64) -> (f32, f32) {
@@ -147,7 +160,22 @@ pub fn edit_active(app: &mut PhotocraftApp) -> Result<(), String> {
 fn hit_offset(app: &mut PhotocraftApp, id: LayerId, x: f64, y: f64) -> usize {
     let Some((l, aff, text)) = layout(app, id) else { return 0 };
     let (tx, ty) = to_text(&aff, x, y);
-    photocraft_text::hit_char(&l, &text, tx, ty).0
+    let path = path_map(app, id);
+    if path.is_none() {
+        return photocraft_text::hit_char(&l, &text, tx, ty).0;
+    }
+    let mut offsets = vec![0, text.len()];
+    offsets.extend(l.clusters.iter().flat_map(|c| [c.range.start, c.range.end]));
+    let mut best = (0usize, f64::INFINITY);
+    for off in offsets {
+        let (cx, top, bot) = l.caret(off.min(text.len()));
+        let (mx, my) = map_text_point(&l, &path, cx, (top + bot) * 0.5);
+        let d = (mx - f64::from(tx)).powi(2) + (my - f64::from(ty)).powi(2);
+        if d < best.1 {
+            best = (off, d);
+        }
+    }
+    best.0
 }
 
 fn hex(c: [f32; 4]) -> String {
@@ -641,6 +669,7 @@ pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewX
     let Some(ed) = app.ui.text_edit.clone() else { return };
     let id = LayerId(ed.layer);
     let Some((l, aff, text)) = layout(app, id) else { return };
+    let path = path_map(app, id);
     let t = crate::theme::Tokens::get(painter.ctx());
     // Text space → screen.
     let scr_t = |x: f32, y: f32| -> Pos2 {
@@ -649,8 +678,8 @@ pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewX
     };
     // Line space (lines, clusters, carets) → screen: vertical type turns it 90° clockwise.
     let scr = |x: f32, y: f32| -> Pos2 {
-        let (x, y) = l.to_text(x, y);
-        scr_t(x, y)
+        let (x, y) = map_text_point(&l, &path, x, y);
+        scr_t(x as f32, y as f32)
     };
     // Tell the OS where the caret is: this is what enables the IME and places its candidate window.
     {
@@ -715,7 +744,12 @@ pub fn draw_overlay(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewX
             }
             if x0 < x1 {
                 let (top, bot) = (ln.baseline - ln.ascent, ln.baseline + ln.descent);
-                painter.add(egui::Shape::convex_polygon(vec![scr(x0, top), scr(x1, top), scr(x1, bot), scr(x0, bot)], fill, Stroke::NONE));
+                let steps = path.as_ref().map_or(1, |_| ((x1 - x0) / 12.0).ceil().clamp(1.0, 16.0) as usize);
+                for i in 0..steps {
+                    let xa = x0 + (x1 - x0) * i as f32 / steps as f32;
+                    let xb = x0 + (x1 - x0) * (i + 1) as f32 / steps as f32;
+                    painter.add(egui::Shape::convex_polygon(vec![scr(xa, top), scr(xb, top), scr(xb, bot), scr(xa, bot)], fill, Stroke::NONE));
+                }
             }
         }
     } else {
