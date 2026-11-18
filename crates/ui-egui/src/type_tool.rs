@@ -7,7 +7,8 @@
 use std::sync::{Arc, PoisonError};
 
 use egui::{Color32, Pos2, Stroke};
-use photocraft_doc::{Document, LayerContent, LayerId, TextLayer};
+use photocraft_doc::path_measure::PathMeasure;
+use photocraft_doc::{Document, LayerContent, LayerId, Path, TextLayer};
 use photocraft_geom::{Affine, Point};
 use photocraft_text::TextLayout;
 use serde_json::json;
@@ -69,6 +70,31 @@ fn hit_layer(app: &mut PhotocraftApp, x: f64, y: f64) -> Option<LayerId> {
         let (tx, ty) = to_text(&aff, x, y);
         shown || photocraft_text::text_point_inside(&l, tx, ty, slop)
     })
+}
+
+/// The document path under a document-space point: its selector and the nearest arc length. The
+/// tolerance is in screen pixels, so clicking a path feels the same at every zoom.
+fn path_under(app: &PhotocraftApp, x: f64, y: f64) -> Option<(String, f64)> {
+    let st = app.session.active()?;
+    let tol = f64::from(6.0 / app.current_zoom().max(0.01));
+    let mut best: Option<(String, f64)> = None;
+    let mut consider = |name: &str, path: &Path| {
+        let measure = PathMeasure::new(path);
+        let near = (0..measure.subpath_count()).filter_map(|i| measure.nearest(i, Point::new(x, y))).min_by(|a, b| a.1.total_cmp(&b.1));
+        if let Some((s, d)) = near
+            && d <= tol
+            && best.as_ref().is_none_or(|(_, prev)| d < *prev)
+        {
+            best = Some((name.to_owned(), s));
+        }
+    };
+    if let Some(path) = st.doc.work_path.as_ref() {
+        consider("work", path);
+    }
+    for named in &st.doc.paths {
+        consider(&named.name, &named.path);
+    }
+    best
 }
 
 /// True when the layer's pixels are what our engine draws for it. A PSD's type layer keeps
@@ -279,6 +305,11 @@ pub fn pointer_up(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2]) {
     {
         if o.type_aa != "sharp" {
             let _ = app.run("type.edit", json!({"layer": id, "antialias": o.type_aa, "coalesce": key}));
+        }
+        // Clicking a path with the Type tool starts type on that path (Photoshop's path-type
+        // cursor). The attach shares the create step, so one undo removes both.
+        if let Some((name, _)) = path_under(app, start[0], start[1]) {
+            let _ = app.run("type.path.attach", json!({"layer": id, "path": name, "x": start[0], "y": start[1], "coalesce": key}));
         }
         // Like Photoshop: the placeholder is selected, so typing replaces it.
         let n = PLACEHOLDER.chars().count();
@@ -1002,6 +1033,70 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Set the text color")));
     if resp.clicked() {
         open_color_picker(app, [c[0], c[1], c[2]]);
+    }
+    // Type on a Path: pick a document path, slide the run and flip it to the other side.
+    let (source, offset, flip) = target(app)
+        .and_then(|(id, _)| {
+            let st = app.session.active()?;
+            let b = text_layer(&st.doc, LayerId(id))?.path.as_ref()?;
+            Some((
+                match &b.source {
+                    Some(photocraft_doc::text::TextPathSource::Work) => "work".to_owned(),
+                    Some(photocraft_doc::text::TextPathSource::Saved(n)) => n.clone(),
+                    None => String::new(),
+                },
+                b.offset,
+                b.flip,
+            ))
+        })
+        .unwrap_or_default();
+    let mut names = vec![String::new(), "work".to_owned()];
+    if let Some(st) = app.session.active() {
+        names.extend(st.doc.paths.iter().map(|p| p.name.clone()));
+    }
+    names.dedup();
+    let labels: Vec<String> = names
+        .iter()
+        .map(|n| {
+            if n.is_empty() {
+                tl!("None").to_owned()
+            } else if n == "work" {
+                tl!("Work Path").to_owned()
+            } else {
+                n.clone()
+            }
+        })
+        .collect();
+    let opts: Vec<(String, &str)> = names.iter().cloned().zip(labels.iter().map(String::as_str)).collect();
+    let mut selected = source.clone();
+    ui.label(tl!("Path"));
+    if crate::widgets::dropdown(ui, "type-path", &mut selected, &opts, 110.0) {
+        let r = if selected.is_empty() {
+            app.run("type.path.detach", json!({}))
+        } else {
+            app.run("type.path.attach", json!({"path": selected}))
+        };
+        if let Err(e) = r {
+            app.ui.status = e;
+            app.ui.status_error = true;
+        }
+    }
+    let mut value = offset;
+    if crate::widgets::value_field(ui, &mut value, -10000.0..=10000.0, "px", 62.0).changed() {
+        let mut p = json!({"offset": value});
+        if let Some(ed) = &app.ui.text_edit {
+            p["coalesce"] = json!(ed.session);
+        }
+        if let Err(e) = app.run("type.path.offset", p) {
+            app.ui.status = e;
+            app.ui.status_error = true;
+        }
+    }
+    if ui.selectable_label(flip, tl!("Flip")).clicked()
+        && let Err(e) = app.run("type.path.flip", json!({}))
+    {
+        app.ui.status = e;
+        app.ui.status_error = true;
     }
     if app.ui.text_edit.is_some() {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

@@ -681,7 +681,7 @@ pub(crate) fn is_work(name: Option<&str>) -> bool {
 /// The path a command targets: `"work"`/absent → the work path (falling back to the active
 /// layer's shape path or vector mask when there is none), `"layer"` → the active layer's,
 /// otherwise a saved path by name.
-fn resolve_path(s: &Session, name: Option<&str>) -> Result<Path> {
+pub(crate) fn resolve_path(s: &Session, name: Option<&str>) -> Result<Path> {
     let d = s.active().ok_or(EngineError::NoDocument)?;
     let layer_path = || -> Option<Path> {
         let l = d.doc.layer(d.active_layer?)?;
@@ -759,6 +759,7 @@ fn path_set(s: &mut Session, p: &Value) -> Result<Value> {
                 None => doc.paths.push(NamedPath { name: n, path, psd_raw: None }),
             }
         }
+        crate::type_path_cmds::reflow_bound_text(doc);
         Ok(())
     })?;
     let path = resolve_path(s, name.as_deref())?;
@@ -863,8 +864,11 @@ fn path_transform(s: &mut Session, p: &Value) -> Result<Value> {
         return Ok(json!({ "name": name, "matrix": m }));
     }
     s.edit("Transform Path", |doc, _| {
-        let path = path_mut(doc, &name, layer_id)?;
-        *path = path.transform(&transform);
+        {
+            let path = path_mut(doc, &name, layer_id)?;
+            *path = path.transform(&transform);
+        }
+        crate::type_path_cmds::reflow_bound_text(doc);
         Ok(())
     })?;
     Ok(json!({ "name": name, "matrix": m }))

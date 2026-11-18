@@ -9,6 +9,7 @@ use skrifa::outline::DrawSettings;
 use skrifa::{GlyphId, MetadataProvider};
 
 use crate::layout::{GlyphOrient, PlacedGlyph, TextLayout};
+use crate::path::PathMap;
 use crate::raster::{Bounds, Coverage, LineSink, Pen, Xform, rect_to};
 use crate::warp::Warp;
 
@@ -25,19 +26,52 @@ pub struct Rendered {
     pub rect: Rect,
 }
 
-/// Bends text-space lines with a [`Warp`], then maps them through `post` into `inner`.
-struct WarpSink<'a, S: LineSink> {
+/// A per-point map applied to glyph outlines in text space: an optional Type-on-a-Path curve,
+/// then an optional Warp. Path first matches Photoshop (the text is placed on the path, and the
+/// warp bends the placed text).
+#[derive(Clone, Copy, Default)]
+pub struct PointMap<'a> {
+    pub path: Option<&'a PathMap>,
+    pub warp: Option<&'a Warp>,
+}
+
+impl PointMap<'_> {
+    /// Maps a text-space point through the path (if any) then the warp (if any).
+    pub fn apply(&self, x: f64, y: f64) -> (f64, f64) {
+        let (x, y) = match self.path {
+            Some(p) => p.apply(x, y),
+            None => (x, y),
+        };
+        match self.warp {
+            Some(w) => w.apply(x, y),
+            None => (x, y),
+        }
+    }
+
+    /// Whether any map is active (used to skip the subdivided sink path).
+    fn is_identity(&self) -> bool {
+        self.path.is_none() && self.warp.is_none()
+    }
+
+    /// Longest segment (text-space px) worth sending through `apply` unsplit.
+    fn max_segment(&self) -> f64 {
+        self.warp.map_or(f64::INFINITY, |w| w.max_segment())
+    }
+}
+
+/// Bends text-space lines with a [`PointMap`], then maps them through `post` into `inner`.
+struct MapSink<'a, S: LineSink> {
     inner: &'a mut S,
-    warp: &'a Warp,
+    map: PointMap<'a>,
     post: Xform,
 }
 
-impl<S: LineSink> LineSink for WarpSink<'_, S> {
+impl<S: LineSink> LineSink for MapSink<'_, S> {
     fn line(&mut self, p0: (f64, f64), p1: (f64, f64)) {
         let len = ((p1.0 - p0.0).powi(2) + (p1.1 - p0.1).powi(2)).sqrt();
-        let n = ((len / self.warp.max_segment()).ceil() as usize).clamp(1, 256);
+        let n = ((len / self.map.max_segment()).ceil() as usize).clamp(1, 256);
         let map = |t: f64| {
-            let (x, y) = self.warp.apply(p0.0 + (p1.0 - p0.0) * t, p0.1 + (p1.1 - p0.1) * t);
+            let (x, y) = self.map.apply(p0.0 + (p1.0 - p0.0) * t, p0.1 + (p1.1 - p0.1) * t);
             self.post.apply(x, y)
         };
         let mut a = map(0.0);
@@ -50,9 +84,9 @@ impl<S: LineSink> LineSink for WarpSink<'_, S> {
 }
 
 /// Draws every glyph and decoration of `layout` whose style colour is `color` (or all of them
-/// when `color` is `None`) into `sink`, through `transform` (text space → sink space), bending
-/// the outlines with `warp` first (in text space).
-fn draw(layout: &TextLayout, transform: &Xform, sink: &mut impl LineSink, only_color: Option<&Color>, warp: Option<&Warp>) {
+/// when `color` is `None`) into `sink`, through `transform` (text space → sink space), mapping
+/// the outlines through `map` first (in text space).
+fn draw(layout: &TextLayout, transform: &Xform, sink: &mut impl LineSink, only_color: Option<&Color>, map: PointMap<'_>) {
     for g in &layout.glyphs {
         let st = &layout.styles[g.style as usize];
         if only_color.is_some_and(|c| c != &st.color) {
@@ -74,19 +108,16 @@ fn draw(layout: &TextLayout, transform: &Xform, sink: &mut impl LineSink, only_c
         for &(ox, oy) in offsets {
             let local = Xform([1.0, 0.0, 0.0, 1.0, ox * r, oy * r]).mul(&glyph);
             let settings = DrawSettings::unhinted(Size::new(face.size_px), LocationRef::new(&coords));
-            match warp {
-                Some(w) => {
-                    let mut ws = WarpSink { inner: &mut *sink, warp: w, post: *transform };
-                    let mut pen = Pen::new(&mut ws, local);
-                    if outline.draw(settings, &mut pen).is_ok() {
-                        skrifa::outline::OutlinePen::close(&mut pen);
-                    }
+            if map.is_identity() {
+                let mut pen = Pen::new(&mut *sink, transform.mul(&local));
+                if outline.draw(settings, &mut pen).is_ok() {
+                    skrifa::outline::OutlinePen::close(&mut pen);
                 }
-                None => {
-                    let mut pen = Pen::new(&mut *sink, transform.mul(&local));
-                    if outline.draw(settings, &mut pen).is_ok() {
-                        skrifa::outline::OutlinePen::close(&mut pen);
-                    }
+            } else {
+                let mut ws = MapSink { inner: &mut *sink, map, post: *transform };
+                let mut pen = Pen::new(&mut ws, local);
+                if outline.draw(settings, &mut pen).is_ok() {
+                    skrifa::outline::OutlinePen::close(&mut pen);
                 }
             }
         }
@@ -96,12 +127,11 @@ fn draw(layout: &TextLayout, transform: &Xform, sink: &mut impl LineSink, only_c
         if only_color.is_some_and(|c| c != &st.color) {
             continue;
         }
-        match warp {
-            Some(w) => {
-                let mut ws = WarpSink { inner: &mut *sink, warp: w, post: *transform };
-                rect_to(&mut ws, &Xform::IDENTITY, d.x0 as f64, d.y0 as f64, d.x1 as f64, d.y1 as f64);
-            }
-            None => rect_to(sink, transform, d.x0 as f64, d.y0 as f64, d.x1 as f64, d.y1 as f64),
+        if map.is_identity() {
+            rect_to(sink, transform, d.x0 as f64, d.y0 as f64, d.x1 as f64, d.y1 as f64);
+        } else {
+            let mut ws = MapSink { inner: &mut *sink, map, post: *transform };
+            rect_to(&mut ws, &Xform::IDENTITY, d.x0 as f64, d.y0 as f64, d.x1 as f64, d.y1 as f64);
         }
     }
 }
@@ -167,7 +197,14 @@ fn rect_from_bounds([x0, y0, x1, y1]: [f64; 4]) -> Rect {
 /// [`ink_rect`] of warped text.
 pub fn ink_rect_warped(layout: &TextLayout, transform: &Affine, warp: Option<&Warp>) -> Rect {
     let mut b = Bounds::default();
-    draw(layout, &Xform(transform.m), &mut b, None, warp);
+    draw(layout, &Xform(transform.m), &mut b, None, PointMap { path: None, warp });
+    b.rect.map(rect_from_bounds).unwrap_or(Rect::EMPTY)
+}
+
+/// [`ink_rect`] of text placed on a path and/or warped.
+pub fn ink_rect_all(layout: &TextLayout, transform: &Affine, warp: Option<&Warp>, path: Option<&PathMap>) -> Rect {
+    let mut b = Bounds::default();
+    draw(layout, &Xform(transform.m), &mut b, None, PointMap { path, warp });
     b.rect.map(rect_from_bounds).unwrap_or(Rect::EMPTY)
 }
 
@@ -179,8 +216,15 @@ pub fn rasterize(layout: &TextLayout, transform: &Affine, format: PixelFormat, a
 
 /// [`rasterize`] with the glyph outlines bent by `warp` (Type › Warp Text).
 pub fn rasterize_warped(layout: &TextLayout, transform: &Affine, format: PixelFormat, antialias: AntiAlias, warp: Option<&Warp>) -> Rendered {
+    rasterize_all(layout, transform, format, antialias, warp, None)
+}
+
+/// [`rasterize`] with the glyph outlines placed on a `path` (Type on a Path) and/or bent by
+/// `warp` (Type › Warp Text).
+pub fn rasterize_all(layout: &TextLayout, transform: &Affine, format: PixelFormat, antialias: AntiAlias, warp: Option<&Warp>, path: Option<&PathMap>) -> Rendered {
+    let map = PointMap { path, warp };
     let format = PixelFormat { alpha: true, ..format };
-    let rect = ink_rect_warped(layout, transform, warp);
+    let rect = ink_rect_all(layout, transform, warp, path);
     let (w, h) = (rect.width() as usize, rect.height() as usize);
     let mut surface = Surface::new(format);
     if w == 0 || h == 0 || (w as u64) * (h as u64) > MAX_PIXELS {
@@ -199,7 +243,7 @@ pub fn rasterize_warped(layout: &TextLayout, transform: &Affine, format: PixelFo
     }
     for c in &colors {
         let mut cov = Coverage::new(w, h);
-        draw(layout, &xf, &mut cov, Some(c), warp);
+        draw(layout, &xf, &mut cov, Some(c), map);
         let cov = cov.finish();
         let comps = color_in(&format, c);
         let a = c.alpha.clamp(0.0, 1.0);
@@ -241,21 +285,18 @@ pub enum PathEl {
     Close,
 }
 
-/// Records outline commands through a text→document map (and an optional warp).
+/// Records outline commands through a text→document map (path and/or warp).
 struct Recorder<'a> {
     glyph: Xform,
     post: Xform,
-    warp: Option<&'a Warp>,
+    map: PointMap<'a>,
     out: Vec<PathEl>,
 }
 
 impl Recorder<'_> {
     fn map(&self, x: f32, y: f32) -> [f64; 2] {
         let (tx, ty) = self.glyph.apply(f64::from(x), f64::from(y));
-        let (tx, ty) = match self.warp {
-            Some(w) => w.apply(tx, ty),
-            None => (tx, ty),
-        };
+        let (tx, ty) = self.map.apply(tx, ty);
         let (dx, dy) = self.post.apply(tx, ty);
         [dx, dy]
     }
@@ -289,6 +330,11 @@ impl skrifa::outline::OutlinePen for Recorder<'_> {
 /// warp, control points are mapped directly, which is exact for straight segments and a close
 /// approximation for curves.
 pub fn outlines(layout: &TextLayout, transform: &Affine, warp: Option<&Warp>) -> Vec<Vec<PathEl>> {
+    outlines_all(layout, transform, warp, None)
+}
+
+/// [`outlines`] with glyph outlines also placed on a path (Type on a Path).
+pub fn outlines_all(layout: &TextLayout, transform: &Affine, warp: Option<&Warp>, path: Option<&PathMap>) -> Vec<Vec<PathEl>> {
     let mut glyphs = Vec::new();
     for g in &layout.glyphs {
         let face = &layout.faces[g.face as usize];
@@ -300,7 +346,7 @@ pub fn outlines(layout: &TextLayout, transform: &Affine, warp: Option<&Warp>) ->
         };
         let coords: Vec<NormalizedCoord> = face.coords.iter().map(|&c| NormalizedCoord::from_bits(c)).collect();
         let glyph = glyph_xform(layout, g, face.skew_deg);
-        let mut rec = Recorder { glyph, post: Xform(transform.m), warp, out: Vec::new() };
+        let mut rec = Recorder { glyph, post: Xform(transform.m), map: PointMap { path, warp }, out: Vec::new() };
         let settings = DrawSettings::unhinted(Size::new(face.size_px), LocationRef::new(&coords));
         if outline.draw(settings, &mut rec).is_ok() && !rec.out.is_empty() {
             glyphs.push(rec.out);

@@ -15,6 +15,7 @@ pub mod blend_if;
 pub mod comps;
 pub mod effects;
 pub mod mode;
+pub mod path_measure;
 pub mod pattern;
 pub mod slices;
 pub mod text;
@@ -362,6 +363,8 @@ pub struct TextLayer {
     pub antialias: text::AntiAlias,
     /// Warp Text settings (applied to the glyph outlines when rendering).
     pub warp: Option<text::TextWarp>,
+    /// Type on a Path: when set, the text flows along this path instead of a straight line.
+    pub path: Option<text::TextPathBinding>,
 }
 
 impl Default for TextLayer {
@@ -380,6 +383,7 @@ impl Default for TextLayer {
             orientation: text::Orientation::Horizontal,
             antialias: text::AntiAlias::Smooth,
             warp: None,
+            path: None,
         }
     }
 }

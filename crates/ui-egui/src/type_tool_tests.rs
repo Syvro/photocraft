@@ -5,7 +5,7 @@
 
 use egui::{Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use photocraft_doc::{LayerContent, LayerId, TextLayer};
 use photocraft_geom::{Affine, Point};
 use serde_json::json;
@@ -1234,4 +1234,39 @@ fn variable_faces_list_the_weights_of_their_axis() {
 fn the_font_menu_lists_served_families() {
     photocraft_text::served::add_families(["Served Menu Test Serif".to_string()]);
     assert!(super::families().iter().any(|f| f == "Served Menu Test Serif"));
+}
+
+#[test]
+fn clicking_a_path_starts_type_on_it() {
+    let mut app = new_app();
+    app.run("path.set", json!({"name": "work", "path": {"subpaths": [{"knots": [[100, 300], [500, 300]]}]}})).unwrap();
+    assert!(!super::pointer_down(&mut app, 250.0, 300.0, false));
+    super::pointer_up(&mut app, [250.0, 300.0], [250.0, 300.0]);
+    let st = app.session.active().unwrap();
+    let id = st.active_layer.unwrap();
+    let b = text_layer(&st.doc, id).unwrap().path.as_ref().expect("the click attached the new text to the path");
+    assert_eq!(b.source, Some(photocraft_doc::text::TextPathSource::Work));
+    assert!(b.start > 100.0 && b.start < 500.0, "start {}", b.start);
+}
+
+#[test]
+fn type_options_bar_exposes_path_offset_and_flip() {
+    let mut app = new_app();
+    app.run("path.set", json!({"name": "work", "path": {"subpaths": [{"knots": [[100, 300], [500, 300]]}]}})).unwrap();
+    let id = app.run("type.create", json!({"text": "On path", "x": 100, "y": 300})).unwrap()["layer"].as_u64().unwrap();
+    app.run("type.path.attach", json!({"layer": id, "path": "work"})).unwrap();
+    app.sync_views();
+    let mut h = Harness::builder().with_size(vec2(1200.0, 60.0)).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            ui.horizontal(|ui| super::options_bar(app, ui));
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    h.run_steps(3);
+    assert!(h.get_all_by_role(egui::accesskit::Role::ComboBox).count() >= 3, "font style, AA and path selectors");
+    assert!(
+        h.get_all_by_role(egui::accesskit::Role::Button).any(|b| b.accesskit_node().label().as_deref() == Some("Flip")),
+        "flip button"
+    );
 }

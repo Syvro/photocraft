@@ -22,6 +22,7 @@ pub mod fonts;
 pub mod glyphs;
 pub mod layout;
 pub mod optical;
+pub mod path;
 pub mod psd;
 pub mod psd_styles;
 pub mod raster;
@@ -124,7 +125,8 @@ impl TextEngine {
     pub fn render(&mut self, layer: &TextLayer, dpi: f32, format: PixelFormat) -> (TextLayout, Rendered) {
         let l = self.layout(layer, dpi);
         let warp = render::layout_warp(&l, layer.warp.as_ref());
-        let r = render::rasterize_warped(&l, &layer.transform, format, layer.antialias, warp.as_ref());
+        let path = layer.path.as_ref().and_then(path::PathMap::new);
+        let r = render::rasterize_all(&l, &layer.transform, format, layer.antialias, warp.as_ref(), path.as_ref());
         (l, r)
     }
 

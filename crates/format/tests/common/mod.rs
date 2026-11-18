@@ -133,6 +133,15 @@ pub fn rich_doc(mode: ColorMode, depth: SampleType) -> Document {
             orientation: text::Orientation::Vertical,
             antialias: text::AntiAlias::Crisp,
             warp: Some(TextWarp { style: "warpArc".into(), value: 25.0, ..Default::default() }),
+            path: Some(text::TextPathBinding {
+                path: Path::new(vec![Subpath::polyline(&[(0.0, 0.0), (80.0, 12.0), (160.0, 0.0)])]),
+                start: 6.5,
+                offset: -2.25,
+                flip: true,
+                subpath: 0,
+                source: Some(text::TextPathSource::Work),
+                source_xform: Some(Affine::translate(-10.5, -20.25)),
+            }),
         }),
     );
     let mut shape = Layer::new(

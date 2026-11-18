@@ -57,9 +57,13 @@ fn edit_path(s: &mut Session, cmd: &str, p: &Value, label: &str, f: impl FnOnce(
             Ok(path_json(&sh.path))
         })?,
         None => s.edit(label, |doc, _| {
-            let path = path_mut(doc, &name, layer)?;
-            f(path).map_err(|e| bad(cmd, e))?;
-            Ok(path_json(path))
+            {
+                let path = path_mut(doc, &name, layer)?;
+                f(path).map_err(|e| bad(cmd, e))?;
+            }
+            let result = path_json(path_mut(doc, &name, layer)?);
+            crate::type_path_cmds::reflow_bound_text(doc);
+            Ok(result)
         })?,
     };
     Ok(json!({ "name": name, "path": path }))

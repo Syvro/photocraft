@@ -10,6 +10,7 @@
 //! truncated), so edits never produce unstyled text.
 
 use photocraft_color::Color;
+use photocraft_geom::Affine;
 use serde::{Deserialize, Serialize};
 
 /// Kerning mode (Photoshop: Metrics, Optical, 0).
@@ -239,6 +240,47 @@ pub enum AntiAlias {
     /// Photoshop's "Windows LCD" (platform subpixel) anti-aliasing; rendered like `Sharp` (we
     /// never produce colour-fringed subpixel text in document pixels).
     WindowsLcd,
+}
+
+/// Type on a Path: the text of a layer flows along a copy of a path instead of a straight line.
+/// The path is stored resolved (in the layer's text space) so layout needs no lookups into the
+/// document's saved paths. Follows Photoshop's model — the text starts where the path is clicked
+/// and re-flows when the path or the text changes.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct TextPathBinding {
+    /// The path the text sits on, in text-space pixels (before the layer transform).
+    pub path: crate::vector::Path,
+    /// Distance along the path (text-space px) at which the first glyph is placed: where the user
+    /// clicked to start the type. Clamped during layout.
+    #[serde(default)]
+    pub start: f32,
+    /// Extra distance (text-space px) the whole run is slid along the path (the Path Style /
+    /// "offset" handle). Positive moves the text forward.
+    #[serde(default)]
+    pub offset: f32,
+    /// Whether the text hangs below the path (Photoshop's "flip" — the other side of the curve).
+    #[serde(default)]
+    pub flip: bool,
+    /// Which subpath index the text runs along (the pen's work path is usually subpath 0).
+    #[serde(default)]
+    pub subpath: usize,
+    /// Where the resolved path came from, when it can be kept live. `None` for a one-off path.
+    #[serde(default)]
+    pub source: Option<TextPathSource>,
+    /// Document → text-space transform captured when the path was resolved. Used to update the
+    /// stored copy when the source path changes.
+    #[serde(default)]
+    pub source_xform: Option<Affine>,
+}
+
+/// A document path a type-on-a-path binding can follow live. Layer paths are stored as one-off
+/// copies: only document work/saved paths are currently re-read after an edit.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TextPathSource {
+    /// The document's unsaved work path.
+    Work,
+    /// A saved path (Paths panel entry) with this name.
+    Saved(String),
 }
 
 /// Warp text settings (Photoshop `warp` descriptor), applied to the glyph outlines by

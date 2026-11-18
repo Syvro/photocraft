@@ -682,6 +682,8 @@ mod tests {
                 | "path.deleteAnchor"
                 | "path.clippingPath.set"
                 | "path.rename"
+                | "type.path.attach"
+                | "type.path.align"
                 | "select.toWorkPath"
                 | "layer.vectorMask.add"
                 | "layer.vectorMask.edit"

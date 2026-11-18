@@ -270,6 +270,8 @@ pub enum ContentM {
         antialias: text::AntiAlias,
         #[serde(default)]
         warp: Option<text::TextWarp>,
+        #[serde(default)]
+        path: Option<text::TextPathBinding>,
     },
     Shape {
         fill: Option<Fill>,

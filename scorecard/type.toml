@@ -7,9 +7,9 @@ order = 5
 [[item]]
 id = "TYPE-218-1"
 target = "Type on a path: path shape, glyphs along the curve, caret follows, PSD round trip"
-status = "missing"
+status = "partial"
 issue = 218
-note = "doc text.rs:209 TextShape has Point and Box only"
+note = "2026-11-17: core path type landed — TextPathBinding in doc/text.rs (path/subpath/start/offset/flip, Work or Saved source + inverse transform), PathMeasure in doc/path_measure.rs, PathMap applied to glyph outlines in text/render.rs; type.path.attach/detach/align/offset/flip/info/reflow in engine/type_path_cmds.rs with reflow on path edits; Type-tool click attaches, options bar has path/offset/flip; .pcraft round trip via format crate; PSD Txt2 round trip and caret/selection overlay following the curve remain open"
 
 [[item]]
 id = "TYPE-218-2"
